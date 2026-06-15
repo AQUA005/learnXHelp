@@ -149,7 +149,7 @@
 				<configuration>
 					<schemaVersion>v2</schemaVersion>
 					<resourceGroup>learnx-group</resourceGroup>
-					<appName>ustc-learnx</appName>
+					<appName>learnxhelp</appName>
 					<pricingTier>B1</pricingTier>
 					<region>southeastasia</region>
 					<runtime>
