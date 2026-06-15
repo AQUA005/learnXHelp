@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- High-Visibility Debugging Error Handler -->
+    <script>
+        window.onerror = function(message, source, lineno, colno, error) {
+            const errorDiv = document.createElement('div');
+            errorDiv.style.position = 'fixed';
+            errorDiv.style.top = '0';
+            errorDiv.style.left = '0';
+            errorDiv.style.width = '100%';
+            errorDiv.style.background = 'rgba(255, 0, 0, 0.95)';
+            errorDiv.style.color = 'white';
+            errorDiv.style.padding = '1.5rem';
+            errorDiv.style.zIndex = '999999';
+            errorDiv.style.fontFamily = 'monospace';
+            errorDiv.style.fontSize = '14px';
+            errorDiv.style.wordBreak = 'break-all';
+            errorDiv.style.boxShadow = '0 4px 20px rgba(0,0,0,0.3)';
+            errorDiv.innerHTML = '<h3 style="margin: 0 0 0.5rem 0; font-size: 16px;">🚨 Frontend Runtime Error Detected</h3>' + 
+                                 '<strong>Message:</strong> ' + message + '<br>' +
+                                 '<strong>Location:</strong> ' + source + ':' + lineno + ':' + colno + '<br>' +
+                                 '<strong>Stack Trace:</strong> ' + (error && error.stack ? error.stack.replace(/\n/g, '<br>') : 'N/A');
+            document.body.appendChild(errorDiv);
+        };
+        window.addEventListener('unhandledrejection', function(event) {
+            const errorDiv = document.createElement('div');
+            errorDiv.style.position = 'fixed';
+            errorDiv.style.top = '0';
+            errorDiv.style.left = '0';
+            errorDiv.style.width = '100%';
+            errorDiv.style.background = 'rgba(255, 68, 68, 0.95)';
+            errorDiv.style.color = 'white';
+            errorDiv.style.padding = '1.5rem';
+            errorDiv.style.zIndex = '999999';
+            errorDiv.style.fontFamily = 'monospace';
+            errorDiv.style.fontSize = '14px';
+            errorDiv.style.wordBreak = 'break-all';
+            errorDiv.style.boxShadow = '0 4px 20px rgba(0,0,0,0.3)';
+            errorDiv.innerHTML = '<h3 style="margin: 0 0 0.5rem 0; font-size: 16px;">⚠️ Unhandled Promise Rejection Detected</h3>' + 
+                                 '<strong>Reason:</strong> ' + event.reason + '<br>' +
+                                 '<strong>Stack Trace:</strong> ' + (event.reason && event.reason.stack ? event.reason.stack.replace(/\n/g, '<br>') : 'N/A');
+            document.body.appendChild(errorDiv);
+        });
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>USTC LearnX - Academic Management System</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- FontAwesome for Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Premium Liquid Mesh Background Blobs -->
+    <div class="bg-blobs-container">
+        <div class="bg-blob blob-1"></div>
+        <div class="bg-blob blob-2"></div>
+        <div class="bg-blob blob-3"></div>
+    </div>
+
+    <div id="app">
+        <!-- Sidebar Navigation -->
+        <aside id="sidebar" style="display: none;">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <h1>
+                        <img src="learnx_logo.png?v=3" alt="Logo" style="height: 32px; width: 32px; border-radius: 50%; object-fit: cover; border: 1px solid var(--glass-border); box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin-right: 6px;"> 
+                        <span>USTC LearnX</span>
+                    </h1>
+                </div>
+                <button id="mobile-menu-close" class="btn-icon mobile-only"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <div class="user-info-sidebar">
+                <div class="profile-pic">
+                    <i class="fa-solid fa-user-circle"></i>
+                </div>
+                <div class="profile-details">
+                    <span class="name" id="user-display-name">Loading...</span>
+                    <span class="role" id="user-display-username">@username</span>
+                </div>
+                <span class="role-badge" id="user-role-badge">Student</span>
+            </div>
+
+            <nav class="sidebar-nav">
+                <ul class="nav-links" id="nav-links-container">
+                    <!-- Nav items dynamically loaded based on roles -->
+                </ul>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="nav-btn btn-secondary w-100" id="btn-logout">
+                    <i class="fa-solid fa-right-from-bracket"></i> Logout
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main View Container -->
+        <div class="main-wrapper">
+            <header class="mobile-header mobile-only" id="mobile-header" style="display: none;">
+                <div class="logo">
+                    <h1><img src="learnx_logo.png?v=3" alt="Logo" style="height: 32px; width: 32px; border-radius: 50%;"> LearnX</h1>
+                </div>
+                <button id="mobile-menu-btn" class="btn-icon"><i class="fa-solid fa-bars"></i></button>
+            </header>
+            <main class="main-content" id="main-view-host">
+                <!-- Dynamic Views Injected Here -->
+            </main>
+        </div>
+    </div>
+
+    <!-- Toast Notification Host -->
+    <div id="notification-host"></div>
+
+    <!-- Client Application Script -->
+    <script src="app.js?v=2" type="module"></script>
+</body>
+</html>
