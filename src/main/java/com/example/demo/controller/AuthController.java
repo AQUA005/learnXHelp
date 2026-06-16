@@ -35,6 +35,7 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final SystemAdminRepository systemAdminRepository;
     private final UniversityRepository universityRepository;
+    private final org.springframework.mail.javamail.JavaMailSender mailSender;
 
     @Data
     @NoArgsConstructor
@@ -204,6 +205,22 @@ public class AuthController {
                 .build();
 
         userRepository.save(user);
+
+        try {
+            org.springframework.mail.SimpleMailMessage message = new org.springframework.mail.SimpleMailMessage();
+            message.setTo(user.getEmail());
+            message.setSubject("LearnX Registration Under Review");
+            message.setText("Hello " + user.getFullName() + ",\n\n"
+                    + "Thank you for registering on LearnX.\n"
+                    + "Your account request is currently pending administrator approval.\n"
+                    + "You will receive another email once your account has been approved.\n\n"
+                    + "Best regards,\n"
+                    + "LearnX Team");
+            mailSender.send(message);
+        } catch (Exception ex) {
+            System.err.println("Failed to send signup email to " + user.getEmail() + ": " + ex.getMessage());
+        }
+
         return ResponseEntity.ok(Map.of("message", "Your form is under progress. You will be notified via email once approved."));
     }
 
@@ -245,6 +262,8 @@ public class AuthController {
         }
         return ResponseEntity.status(401).body(Map.of("error", "User session invalid"));
     }
+
+
 
     @PostMapping("/logout")
     public ResponseEntity<?> logout(HttpServletRequest servletRequest) {

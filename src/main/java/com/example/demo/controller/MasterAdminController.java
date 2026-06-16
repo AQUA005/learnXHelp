@@ -39,6 +39,8 @@ public class MasterAdminController {
     private final CourseRepository courseRepository;
     private final SystemMetadataRepository systemMetadataRepository;
     private final SystemAdminRepository systemAdminRepository;
+    private final BugReportRepository bugReportRepository;
+    private final org.springframework.mail.javamail.JavaMailSender mailSender;
 
     @Data
     @NoArgsConstructor
@@ -324,6 +326,101 @@ public class MasterAdminController {
                 "message", "Master profile updated successfully!",
                 "fullName", sysAdmin.getFullName(),
                 "email", sysAdmin.getEmail()
+        ));
+    }
+
+    @GetMapping("/bugs")
+    public ResponseEntity<?> listBugs() {
+        return ResponseEntity.ok(bugReportRepository.findAllByOrderByCreatedAtDesc());
+    }
+
+    @PostMapping("/bugs/{id}/status")
+    public ResponseEntity<?> updateBugStatus(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        Optional<BugReport> bugOpt = bugReportRepository.findById(id);
+        if (bugOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        String status = body.get("status");
+        if (status == null || status.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Status is required"));
+        }
+        BugReport bug = bugOpt.get();
+        bug.setStatus(status.trim().toUpperCase());
+        bugReportRepository.save(bug);
+        return ResponseEntity.ok(bug);
+    }
+
+    @GetMapping("/users/emails")
+    public ResponseEntity<?> listUserEmails() {
+        List<Map<String, Object>> result = userRepository.findAll().stream()
+                .map(u -> {
+                    java.util.Map<String, Object> m = new java.util.HashMap<>();
+                    m.put("id", u.getId());
+                    m.put("fullName", u.getFullName() != null ? u.getFullName() : "");
+                    m.put("email", u.getEmail() != null ? u.getEmail() : "");
+                    m.put("username", u.getUsername());
+                    m.put("role", u.getRole() != null ? u.getRole().toString() : "USER");
+                    m.put("universityName", u.getUniversity() != null ? u.getUniversity().getName() : "LearnX");
+                    return m;
+                })
+                .filter(m -> m.get("email") != null && !((String) m.get("email")).trim().isEmpty())
+                .toList();
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/send-email")
+    public ResponseEntity<?> sendBroadcastEmail(@RequestBody Map<String, Object> body) {
+        String subject = (String) body.get("subject");
+        String content = (String) body.get("content");
+        List<String> recipientEmails = (List<String>) body.get("recipientEmails");
+
+        if (subject == null || subject.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Subject is required"));
+        }
+        if (content == null || content.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Content is required"));
+        }
+
+        List<String> finalRecipients;
+        if (recipientEmails == null || recipientEmails.isEmpty()) {
+            finalRecipients = userRepository.findAll().stream()
+                    .map(User::getEmail)
+                    .filter(e -> e != null && !e.trim().isEmpty())
+                    .distinct()
+                    .toList();
+        } else {
+            finalRecipients = recipientEmails.stream()
+                    .filter(e -> e != null && !e.trim().isEmpty())
+                    .distinct()
+                    .toList();
+        }
+
+        if (finalRecipients.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "No recipients found to send email to"));
+        }
+
+        int successCount = 0;
+        int failCount = 0;
+
+        for (String email : finalRecipients) {
+            try {
+                org.springframework.mail.SimpleMailMessage message = new org.springframework.mail.SimpleMailMessage();
+                message.setTo(email);
+                message.setSubject(subject);
+                message.setText(content + "\n\n---\nSent via LearnX Master Broadcast System.");
+                mailSender.send(message);
+                successCount++;
+            } catch (Exception ex) {
+                System.err.println("Failed to send broadcast email to " + email + ": " + ex.getMessage());
+                failCount++;
+            }
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Broadcast complete",
+                "totalSent", finalRecipients.size(),
+                "successCount", successCount,
+                "failCount", failCount
         ));
     }
 }

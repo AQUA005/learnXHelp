@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface ExamQuestionRepository extends JpaRepository<ExamQuestion, Long> {
     List<ExamQuestion> findByExam(Exam exam);
+    void deleteByExam(Exam exam);
 }

@@ -38,6 +38,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/h2-console/**").permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/bugs/**").permitAll()
                 .requestMatchers("/api/master/**").permitAll()
                 .requestMatchers("/api/admin/**").permitAll()
                 .requestMatchers("/", "/index.html", "/app.js", "/style.css", "/learnx_logo.png", "/ustc_building.jpg", "/favicon.ico").permitAll()

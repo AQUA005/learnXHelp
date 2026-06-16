@@ -9,4 +9,5 @@ public interface ResourceRepository extends JpaRepository<Resource, Long> {
     List<Resource> findByApproved(boolean approved);
     List<Resource> findByCourseNameAndApproved(String courseName, boolean approved);
     List<Resource> findByStudentClassAndApproved(StudentClass studentClass, boolean approved);
+    List<Resource> findByUploadedBy(com.example.demo.entity.User uploadedBy);
 }

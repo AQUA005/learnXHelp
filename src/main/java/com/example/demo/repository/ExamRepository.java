@@ -8,4 +8,5 @@ import java.util.List;
 public interface ExamRepository extends JpaRepository<Exam, Long> {
     List<Exam> findByPublished(boolean published);
     List<Exam> findByStudentClassAndPublished(StudentClass studentClass, boolean published);
+    List<Exam> findByTeacher(com.example.demo.entity.User teacher);
 }

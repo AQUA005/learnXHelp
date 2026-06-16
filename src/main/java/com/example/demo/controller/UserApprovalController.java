@@ -29,6 +29,7 @@ public class UserApprovalController {
     private final StudentClassRepository studentClassRepository;
     private final ProfileChangeRequestRepository profileChangeRequestRepository;
     private final PasswordEncoder passwordEncoder;
+    private final org.springframework.mail.javamail.JavaMailSender mailSender;
 
     @GetMapping("/pending")
     public ResponseEntity<?> getPendingUsers(Principal principal) {
@@ -137,6 +138,21 @@ public class UserApprovalController {
 
         targetUser.setApproved(true);
         userRepository.save(targetUser);
+
+        try {
+            org.springframework.mail.SimpleMailMessage message = new org.springframework.mail.SimpleMailMessage();
+            message.setTo(targetUser.getEmail());
+            message.setSubject("LearnX Account Approved");
+            message.setText("Hello " + targetUser.getFullName() + ",\n\n"
+                    + "Your LearnX account request has been approved!\n"
+                    + "You can now log in using your registered username: " + targetUser.getUsername() + "\n\n"
+                    + "Best regards,\n"
+                    + "LearnX Team");
+            mailSender.send(message);
+        } catch (Exception ex) {
+            System.err.println("Failed to send approval email to " + targetUser.getEmail() + ": " + ex.getMessage());
+        }
+
         return ResponseEntity.ok(Map.of("message", "User account approved successfully"));
     }
 
@@ -174,6 +190,20 @@ public class UserApprovalController {
         if (!canReject) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("error", "You do not have permission to reject a user with role: " + targetRole));
+        }
+
+        try {
+            org.springframework.mail.SimpleMailMessage message = new org.springframework.mail.SimpleMailMessage();
+            message.setTo(targetUser.getEmail());
+            message.setSubject("LearnX Account Request Rejected");
+            message.setText("Hello " + targetUser.getFullName() + ",\n\n"
+                    + "Your LearnX registration request has been rejected.\n"
+                    + "If you think this was a mistake, please register again with correct details or contact support.\n\n"
+                    + "Best regards,\n"
+                    + "LearnX Team");
+            mailSender.send(message);
+        } catch (Exception ex) {
+            System.err.println("Failed to send rejection email to " + targetUser.getEmail() + ": " + ex.getMessage());
         }
 
         userRepository.delete(targetUser);
@@ -287,6 +317,19 @@ public class UserApprovalController {
         req.setApproved(true);
         profileChangeRequestRepository.save(req);
 
+        try {
+            org.springframework.mail.SimpleMailMessage message = new org.springframework.mail.SimpleMailMessage();
+            message.setTo(targetUser.getEmail());
+            message.setSubject("LearnX Profile Changes Approved");
+            message.setText("Hello " + targetUser.getFullName() + ",\n\n"
+                    + "Your requested profile modifications have been approved by the administrator and applied to your account.\n\n"
+                    + "Best regards,\n"
+                    + "LearnX Team");
+            mailSender.send(message);
+        } catch (Exception ex) {
+            System.err.println("Failed to send profile approval email to " + targetUser.getEmail() + ": " + ex.getMessage());
+        }
+
         return ResponseEntity.ok(Map.of("message", "Profile change request approved and applied successfully"));
     }
 
@@ -307,6 +350,19 @@ public class UserApprovalController {
 
         req.setRejected(true);
         profileChangeRequestRepository.save(req);
+
+        try {
+            org.springframework.mail.SimpleMailMessage message = new org.springframework.mail.SimpleMailMessage();
+            message.setTo(req.getUser().getEmail());
+            message.setSubject("LearnX Profile Changes Rejected");
+            message.setText("Hello " + req.getUser().getFullName() + ",\n\n"
+                    + "Your requested profile modifications have been rejected by the administrator.\n\n"
+                    + "Best regards,\n"
+                    + "LearnX Team");
+            mailSender.send(message);
+        } catch (Exception ex) {
+            System.err.println("Failed to send profile rejection email to " + req.getUser().getEmail() + ": " + ex.getMessage());
+        }
 
         return ResponseEntity.ok(Map.of("message", "Profile change request rejected"));
     }

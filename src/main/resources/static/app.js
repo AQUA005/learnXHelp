@@ -1,11 +1,12 @@
-// USTC LearnX SPA Engine
+// LearnX SPA Engine
 
 // Application Global State
 let state = {
     user: null, // Logged in user details {id, username, fullName, role}
     activeView: 'dashboard',
     cts: [],
-    timerIntervals: [] // Store countdown intervals to clear them on view changes
+    timerIntervals: [], // Store countdown intervals to clear them on view changes
+    currentUniversity: null // Store university branding details {name, logoUrl}
 };
 
 // Toast Notifications Helper
@@ -57,17 +58,6 @@ function formatDateTime(dateTimeStr) {
 // Fetch helper with auto-redirect to login on 401
 async function apiFetch(url, options = {}) {
     try {
-        const currentDomain = localStorage.getItem('currentUniversityDomain');
-        if (currentDomain) {
-            if (!options.headers) {
-                options.headers = {};
-            }
-            if (options.headers instanceof Headers) {
-                options.headers.set('X-University-Domain', currentDomain);
-            } else {
-                options.headers['X-University-Domain'] = currentDomain;
-            }
-        }
         const response = await fetch(url, options);
         if (response.status === 401 && !url.includes('/api/auth/current-user') && !url.includes('/api/auth/login')) {
             state.user = null;
@@ -102,11 +92,61 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // Bug Report FAB & Modal setup
+    const fabReportBug = document.getElementById('fab-report-bug');
+    const modalBugReport = document.getElementById('modal-bug-report');
+    const btnCloseBugModal = document.getElementById('btn-close-bug-modal');
+    const formBugReport = document.getElementById('form-bug-report');
+
+    if (fabReportBug && modalBugReport) {
+        fabReportBug.addEventListener('click', () => {
+            if (state.user) {
+                document.getElementById('bug-report-sender').value = `${state.user.fullName} (${state.user.email || state.user.username})`;
+            } else {
+                document.getElementById('bug-report-sender').value = '';
+            }
+            modalBugReport.style.display = 'flex';
+        });
+    }
+
+    if (btnCloseBugModal && modalBugReport) {
+        btnCloseBugModal.addEventListener('click', () => {
+            modalBugReport.style.display = 'none';
+        });
+    }
+
+    if (formBugReport) {
+        formBugReport.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = document.getElementById('bug-report-title').value;
+            const description = document.getElementById('bug-report-desc').value;
+            const reportedBy = document.getElementById('bug-report-sender').value;
+
+            try {
+                const res = await apiFetch('/api/bugs/report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, description, reportedBy })
+                });
+
+                if (res && res.ok) {
+                    showToast("Bug reported successfully! Thank you.");
+                    formBugReport.reset();
+                    modalBugReport.style.display = 'none';
+                } else {
+                    showToast("Failed to submit report.", "error");
+                }
+            } catch (err) {
+                showToast("Error connecting to server.", "error");
+            }
+        });
+    }
+
     // 2. Check login status
     await checkAuth();
 });
 
-// Check if user has active Batch
+// Check if user has active Session
 async function checkAuth() {
     try {
         const res = await apiFetch('/api/auth/current-user');
@@ -128,6 +168,11 @@ async function checkAuth() {
 
 async function renderLandingPage() {
     clearAllIntervals();
+    const sidebar = document.getElementById('sidebar');
+    const mobileHeader = document.getElementById('mobile-header');
+    if (sidebar) sidebar.style.display = 'none';
+    if (mobileHeader) mobileHeader.style.display = 'none';
+
     const host = document.getElementById('main-view-host');
     host.innerHTML = `
         <div class="landing-container">
@@ -136,7 +181,7 @@ async function renderLandingPage() {
                 <div class="split-side-content" style="background: rgba(255, 255, 255, 0.95); justify-content: center; overflow-y: auto; padding: 2rem 1.5rem;">
                     <div style="display: flex; flex-direction: column; gap: 1.5rem; text-align: left; max-width: 440px; margin: 0 auto; width: 100%;">
                         <div style="display: flex; align-items: center; gap: 0.8rem;">
-                            <img src="learnx_logo.png?v=3" alt="LearnX Logo" style="width: 50px; height: 50px; object-fit: contain;">
+                            <img src="/learnx_logo.png?v=3" alt="LearnX Logo" style="width: 50px; height: 50px; object-fit: contain;">
                             <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.8rem; font-weight: 700; color: #11212D; margin: 0;">LearnX</h2>
                         </div>
                         <div>
@@ -152,14 +197,6 @@ async function renderLandingPage() {
                             <button class="btn btn-login-goto" style="flex: 1; background: #11212D; color: #fff; border: none; border-radius: 30px; padding: 0.8rem; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: all 0.2s;">Sign In</button>
                             <button class="btn btn-secondary btn-signup-goto" style="flex: 1; background: transparent; color: #11212D; border: 1.5px solid #11212D; border-radius: 30px; padding: 0.75rem; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: all 0.2s;">Create Account</button>
                         </div>
-                        
-                        <!-- Universities Directory Section -->
-                        <div class="uni-directory">
-                            <h3 class="uni-directory-title"><i class="fa-solid fa-graduation-cap"></i> Registered Universities</h3>
-                            <div class="uni-grid" id="uni-directory-grid">
-                                <div style="font-size: 0.85rem; color: var(--text-muted);">Loading university directory...</div>
-                            </div>
-                        </div>
                     </div>
                 </div>
                 <!-- Right Side: Fluid Liquid Glass Animation -->
@@ -169,8 +206,8 @@ async function renderLandingPage() {
                     <div class="fluid-blob fluid-blob-3"></div>
                     
                     <div class="glass-panel" style="position: relative; z-index: 10; max-width: 320px; padding: 2rem; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); text-align: center; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.15); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);">
-                        <img src="learnx_logo.png?v=3" alt="LearnX Logo" style="width: 70px; height: 70px; object-fit: contain; background: #fff; border-radius: 50%; padding: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); margin-bottom: 1.2rem;">
-                        <h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.4rem; color: #fff; margin-bottom: 0.5rem; font-weight: 600;">LearnX Portal</h3>
+                        <img src="/learnx_logo.png?v=3" alt="LearnX Logo" style="width: 70px; height: 70px; object-fit: contain; background: #fff; border-radius: 50%; padding: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); margin-bottom: 1.2rem;">
+                        <h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.4rem; color: #fff; margin-bottom: 0.5rem; font-weight: 600;">LearnX</h3>
                         <p style="font-family: 'Outfit', sans-serif; font-size: 0.88rem; color: rgba(255, 255, 255, 0.7); line-height: 1.45; margin: 0;">
                             Empower your learning journey with seamless study organization, intelligent scheduling, and performance analytics.
                         </p>
@@ -179,54 +216,118 @@ async function renderLandingPage() {
             </div>
         </div>
     `;
+
     host.querySelector('.btn-login-goto').addEventListener('click', renderAuthPage);
     host.querySelector('.btn-signup-goto').addEventListener('click', () => {
         renderAuthPage();
         showSignupForm();
     });
-    
-    // Load universities dynamically
-    try {
-        const res = await fetch('/api/master/universities');
-        const grid = document.getElementById('uni-directory-grid');
-        if (grid) {
-            grid.innerHTML = '';
-            
-            if (res.ok) {
-                const list = await res.json();
-                if (list.length === 0) {
-                    grid.innerHTML = `
-                        <div style="grid-column: 1 / -1; text-align: center; padding: 2rem; color: rgba(255,255,255,0.7); font-size: 0.95rem;">
-                            No universities registered yet.
+}
+
+// Dedicated System Admin Login Page
+function renderAdminLoginPage() {
+    clearAllIntervals();
+    const sidebar = document.getElementById('sidebar');
+    const mobileHeader = document.getElementById('mobile-header');
+    if (sidebar) sidebar.style.display = 'none';
+    if (mobileHeader) mobileHeader.style.display = 'none';
+
+    const host = document.getElementById('main-view-host');
+    host.innerHTML = `
+        <div class="landing-container">
+            <div class="split-screen-container">
+                <!-- Left Side: Admin Login Form -->
+                <div class="split-side-content" id="admin-auth-content" style="background: rgba(255, 255, 255, 0.95); justify-content: center; overflow-y: auto; padding: 2rem 1.5rem;">
+                    <div style="display: flex; flex-direction: column; gap: 1.2rem; max-width: 400px; margin: auto auto; width: 100%; padding: 1.5rem 0;">
+                        <div style="display: flex; justify-content: flex-start; align-items: center; gap: 0.5rem;">
+                            <img src="/learnx_logo.png?v=3" alt="LearnX Logo" style="width: 44px; height: 44px; object-fit: contain;">
+                            <span style="font-family:'Space Grotesk'; font-size:1.3rem; font-weight:700; color:#11212D;">LearnX Admin</span>
                         </div>
-                    `;
-                } else {
-                    list.forEach(uni => {
-                        const card = document.createElement('div');
-                        card.className = 'uni-card';
-                        const initials = uni.name.split(' ').map(w => w[0]).join('').substring(0, 3).toUpperCase();
                         
-                        let logoHtml = `<div class="uni-logo-placeholder">${initials}</div>`;
-                        if (uni.logoUrl && uni.logoUrl.trim().length > 10) {
-                            logoHtml = `<img src="${uni.logoUrl}" alt="${uni.name} Logo" class="uni-logo-img">`;
-                        }
+                        <div class="auth-header" style="text-align: left;">
+                            <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 2.1rem; font-weight: 800; color: #06141B; margin: 0 0 0.4rem 0; letter-spacing: -0.5px;">System Admin</h2>
+                            <p style="color: #4A5C6A; font-size: 0.95rem; margin: 0; line-height: 1.35;">
+                                Sign in to access the master administration panel.
+                            </p>
+                        </div>
                         
-                        card.innerHTML = `
-                            ${logoHtml}
-                            <div class="uni-card-name" title="${uni.name}">${uni.name.substring(0, 25)}${uni.name.length > 25 ? '...' : ''}</div>
-                        `;
-                        card.addEventListener('click', () => {
-                            localStorage.setItem('currentUniversityDomain', uni.domain);
-                            window.location.reload();
-                        });
-                        grid.appendChild(card);
-                    });
+                        <form id="form-admin-login" style="display: flex; flex-direction: column; gap: 0.9rem;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label for="admin-login-username" style="font-weight: 600; color: #253745; font-size: 0.9rem; margin-bottom: 0.3rem; display: block;">Username</label>
+                                <input type="text" id="admin-login-username" class="form-input" required placeholder="e.g. master" style="border-radius: 20px; border: 1px solid #9BA8AB; padding: 0.65rem 1rem;">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label for="admin-login-password" style="font-weight: 600; color: #253745; font-size: 0.9rem; margin-bottom: 0.3rem; display: block;">Password</label>
+                                <input type="password" id="admin-login-password" class="form-input" required placeholder="••••••••" style="border-radius: 20px; border: 1px solid #9BA8AB; padding: 0.65rem 1rem;">
+                            </div>
+                            <button type="submit" class="btn" style="margin-top: 0.4rem; background: #11212D; color: #fff; border: none; border-radius: 30px; padding: 0.75rem; font-weight: 600; cursor: pointer; font-size: 0.95rem; width: 100%;">
+                                <i class="fa-solid fa-shield-halved"></i> Sign In as Admin
+                            </button>
+                        </form>
+                        
+                        <a id="link-admin-back-directory" style="text-align: center; color: #4A5C6A; font-size: 0.88rem; text-decoration: none; cursor: pointer; margin-top: 0.8rem; display: block; font-weight: 600;">
+                            <i class="fa-solid fa-arrow-left"></i> Back to Home Page
+                        </a>
+                    </div>
+                </div>
+                <!-- Right Side: Fluid Liquid Glass Animation -->
+                <div class="split-side-animation">
+                    <div class="fluid-blob fluid-blob-1"></div>
+                    <div class="fluid-blob fluid-blob-2"></div>
+                    <div class="fluid-blob fluid-blob-3"></div>
+                    
+                    <div class="glass-panel" style="position: relative; z-index: 10; max-width: 320px; padding: 2rem; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); text-align: center; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.15); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);">
+                        <i class="fa-solid fa-shield-halved" style="font-size: 3rem; color: rgba(255, 255, 255, 0.85); margin-bottom: 1rem;"></i>
+                        <h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.4rem; color: #fff; margin-bottom: 0.5rem; font-weight: 600;">Admin Panel</h3>
+                        <p style="font-family: 'Outfit', sans-serif; font-size: 0.88rem; color: rgba(255, 255, 255, 0.7); line-height: 1.45; margin: 0;">
+                            Review bug reports and broadcast announcements from the master control panel.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('link-admin-back-directory').addEventListener('click', () => {
+        renderLandingPage();
+    });
+
+    document.getElementById('form-admin-login').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('admin-login-username').value;
+        const password = document.getElementById('admin-login-password').value;
+
+        try {
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+
+            if (res && res.ok) {
+                state.user = await res.json();
+                if (state.user.role !== 'SYSTEM_ADMIN') {
+                    showToast("This login is for system administrators only. Please use the standard login page to sign in.", "error");
+                    // Log them out
+                    await fetch('/api/auth/logout', { method: 'POST' });
+                    state.user = null;
+                    return;
                 }
+                setupSidebar();
+                switchView('master-admin-panel');
+                showToast(`Welcome back, ${state.user.fullName}!`);
+            } else if (res) {
+                let errMsg = "Login failed";
+                try {
+                    const err = await res.json();
+                    errMsg = err.error || errMsg;
+                } catch (jsonErr) {}
+                showToast(errMsg, "error");
             }
+        } catch (err) {
+            showToast("Error connecting to server", "error");
         }
-    } catch (e) {
-        console.error("Failed to load university directory", e);
-    }
+    });
 }
 
 // Setup Header Navigation according to role
@@ -277,13 +378,12 @@ function setupSidebar() {
         addNavItem('Profile', 'profile', 'fa-user-gear');
     } else if (state.user.role === 'ADMIN') {
         addNavItem('Home', 'dashboard', 'fa-house');
-        addNavItem('Academic Panel', 'uni-admin-panel', 'fa-school-flag');
+        addNavItem('Academic Panel', 'uni-admin-panel', 'fa-sliders');
         addNavItem('Profile Verification', 'profile-verification', 'fa-user-check');
         addNavItem('Routine Builder', 'routine-builder', 'fa-calendar-plus');
         addNavItem('Logs', 'audit-history', 'fa-clock-rotate-left');
         addNavItem('Schedule', 'routine-mgr', 'fa-calendar-days');
         addNavItem('Announcements', 'announcements', 'fa-bullhorn');
-        addNavItem('Settings', 'system-config', 'fa-cogs');
         addNavItem('Profile', 'profile', 'fa-user-gear');
     } else if (state.user.role === 'SYSTEM_ADMIN') {
         addNavItem('Master Panel', 'master-admin-panel', 'fa-server');
@@ -365,9 +465,6 @@ function switchView(viewName) {
             break;
         case 'performance-view':
             renderPerformanceView(host);
-            break;
-        case 'system-config':
-            renderSystemConfig(host);
             break;
         case 'uni-admin-panel':
             renderUniAdminPanel(host);
@@ -509,202 +606,7 @@ async function renderProfilePage(host) {
         ? `<img src="${state.user.profilePicUrl}" alt="Avatar" class="profile-avatar-image">`
         : `<div class="profile-avatar-placeholder"><i class="fa-solid fa-user"></i></div>`;
 
-    if (state.user.role === 'ADMIN') {
-        host.innerHTML = `
-            <div class="view-header">
-                <div class="view-title">
-                    <h2>My Profile & University settings</h2>
-                    <p>Manage your account details and your university profile information.</p>
-                </div>
-            </div>
-            <div class="profile-showcase-container" style="display:grid; grid-template-columns: 1fr 1.5fr; gap:1.5rem;" class="responsive-grid">
-                <!-- Left: Profile and University Branding Details -->
-                <div class="glass-panel premium-profile-card" style="display:flex; flex-direction:column; gap:1.2rem; align-items:center; text-align:center;">
-                    <div class="profile-avatar-wrapper" id="avatar-wrapper">
-                        ${avatarHtml}
-                        <div class="avatar-edit-overlay">
-                            <i class="fa-solid fa-camera"></i>
-                        </div>
-                        <input type="file" id="avatar-file-input" accept="image/*">
-                    </div>
-                    <div>
-                        <div class="profile-card-name">${state.user.fullName}</div>
-                        <div class="profile-card-role">@${state.user.username} · ${state.user.role}</div>
-                    </div>
-                    
-                    <div style="border-top: 1px solid var(--glass-border); width: 100%; padding-top: 1rem; margin-top: 0.5rem; text-align: left;">
-                        <h4 style="font-family:'Space Grotesk'; font-size:1rem; margin-bottom:0.8rem; color:var(--accent-blue);">University Information</h4>
-                        <div id="profile-uni-brand-display" style="display:flex; flex-direction:column; align-items:center; gap:0.6rem;">
-                            <div id="uni-profile-logo-container" style="width: 80px; height: 80px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.3); border-radius:16px; border:1px solid var(--glass-border); overflow:hidden;">
-                                <i class="fa-solid fa-school" style="font-size:2rem; color:var(--text-muted);"></i>
-                            </div>
-                            <div id="uni-profile-name-lbl" style="font-weight:700; font-size:1.05rem;">Loading university...</div>
-                            <div id="uni-profile-domain-lbl" style="font-size:0.85rem; color:var(--text-secondary);">domain.com</div>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- Right: Settings Form -->
-                <div class="glass-panel section-card">
-                    <h3>Edit Profile Details</h3>
-                    <form id="form-profile-update" style="display:flex; flex-direction:column; gap:0.8rem;">
-                        <h4 style="font-family:'Space Grotesk'; font-size:0.95rem; border-bottom:1px solid rgba(0,0,0,0.05); padding-bottom:0.4rem; color:var(--accent-blue);">Personal Account</h4>
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.8rem;" class="responsive-grid">
-                            <div class="form-group">
-                                <label>Username</label>
-                                <input type="text" class="form-input" disabled value="${state.user.username}">
-                            </div>
-                            <div class="form-group">
-                                <label for="profile-fullname">Full Name</label>
-                                <input type="text" id="profile-fullname" class="form-input" required value="${state.user.fullName}">
-                            </div>
-                            <div class="form-group" style="grid-column: 1 / -1;">
-                                <label for="profile-email">Email Address</label>
-                                <input type="email" id="profile-email" class="form-input" required value="${state.user.email}">
-                            </div>
-                        </div>
-
-                        <h4 style="font-family:'Space Grotesk'; font-size:0.95rem; border-bottom:1px solid rgba(0,0,0,0.05); padding-bottom:0.4rem; margin-top:1rem; color:var(--accent-blue);">University Profile</h4>
-                        <div class="form-group">
-                            <label for="profile-uni-name">University Name</label>
-                            <input type="text" id="profile-uni-name" class="form-input" required placeholder="e.g. University of Science & Technology">
-                        </div>
-                        <div class="form-group">
-                            <label>University Domain (Read-only)</label>
-                            <input type="text" id="profile-uni-domain" class="form-input" disabled>
-                        </div>
-                        
-                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.8rem;" class="responsive-grid">
-                            <div class="form-group">
-                                <label for="profile-uni-logo-url">Logo Image URL</label>
-                                <input type="text" id="profile-uni-logo-url" class="form-input" placeholder="e.g. https://site.com/logo.png">
-                            </div>
-                            <div class="form-group">
-                                <label>Or Upload Logo File</label>
-                                <input type="file" id="profile-uni-logo-file" accept="image/*" class="form-input" style="padding:0.4rem 0.6rem;">
-                            </div>
-                        </div>
-
-                        <button type="submit" class="btn" style="margin-top: 1.5rem; background:var(--accent-blue); color:#fff; border:none; border-radius:20px; padding:0.6rem 1rem;">
-                            <i class="fa-solid fa-floppy-disk"></i> Save Profile & University settings
-                        </button>
-                    </form>
-                </div>
-            </div>
-        `;
-
-        const loadUniDetails = async () => {
-            try {
-                const res = await apiFetch('/api/admin/university');
-                if (res && res.ok) {
-                    const uni = await res.json();
-                    document.getElementById('uni-profile-name-lbl').innerText = uni.name;
-                    document.getElementById('uni-profile-domain-lbl').innerText = uni.domain;
-                    document.getElementById('profile-uni-name').value = uni.name;
-                    document.getElementById('profile-uni-domain').value = uni.domain;
-                    document.getElementById('profile-uni-logo-url').value = uni.logoUrl || '';
-
-                    const logoContainer = document.getElementById('uni-profile-logo-container');
-                    if (uni.logoUrl && uni.logoUrl.trim().length > 10) {
-                        logoContainer.innerHTML = `<img src="${uni.logoUrl}" alt="Uni Logo" style="width:100%; height:100%; object-fit:contain;">`;
-                    } else {
-                        logoContainer.innerHTML = `<i class="fa-solid fa-school" style="font-size:2rem; color:var(--text-muted);"></i>`;
-                    }
-                }
-            } catch(e) {}
-        };
-
-        loadUniDetails();
-
-        const logoFileInput = document.getElementById('profile-uni-logo-file');
-        logoFileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            if (file.size > 5 * 1024 * 1024) {
-                showToast('Image must be under 5MB', 'error');
-                return;
-            }
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                const base64 = ev.target.result;
-                document.getElementById('profile-uni-logo-url').value = base64;
-                document.getElementById('uni-profile-logo-container').innerHTML = `<img src="${base64}" alt="Uni Logo" style="width:100%; height:100%; object-fit:contain;">`;
-                showToast("Logo file loaded! Save changes to persist.", "warning");
-            };
-            reader.readAsDataURL(file);
-        });
-
-        document.getElementById('form-profile-update').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const fullName = document.getElementById('profile-fullname').value;
-            const email = document.getElementById('profile-email').value;
-            const uniName = document.getElementById('profile-uni-name').value;
-            const uniLogoUrl = document.getElementById('profile-uni-logo-url').value;
-
-            try {
-                const resProfile = await apiFetch('/api/profile/update', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ fullName, email })
-                });
-
-                const resUni = await apiFetch('/api/admin/university', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: uniName, logoUrl: uniLogoUrl })
-                });
-
-                if (resProfile && resProfile.ok && resUni && resUni.ok) {
-                    state.user.fullName = fullName;
-                    state.user.email = email;
-                    showToast("Profile and University settings saved successfully!");
-                    loadUniDetails();
-                } else {
-                    showToast("Failed to save settings", "error");
-                }
-            } catch(err) {
-                showToast("Connection failed", "error");
-            }
-        });
-
-        const avatarWrapper = document.getElementById('avatar-wrapper');
-        const avatarInput = document.getElementById('avatar-file-input');
-        avatarInput.addEventListener('click', (e) => e.stopPropagation());
-        avatarWrapper.addEventListener('click', () => avatarInput.click());
-        avatarInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            if (file.size > 5 * 1024 * 1024) {
-                showToast('Image must be under 5MB', 'error');
-                return;
-            }
-            const reader = new FileReader();
-            reader.onload = async (ev) => {
-                const base64 = ev.target.result;
-                avatarWrapper.querySelector('.profile-avatar-image, .profile-avatar-placeholder').outerHTML = `<img src="${base64}" alt="Avatar" class="profile-avatar-image">`;
-                const sidebarPicEl = document.querySelector('.profile-pic');
-                sidebarPicEl.innerHTML = `<img src="${base64}" alt="Avatar" style="width: 3rem; height: 3rem; border-radius: 50%; object-fit: cover; border: 2px solid var(--glass-border); box-shadow: 0 4px 10px rgba(0,0,0,0.1);">`;
-                try {
-                    const res = await apiFetch('/api/profile/update', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ profilePicUrl: base64 })
-                    });
-                    if (res && res.ok) {
-                        state.user.profilePicUrl = base64;
-                        showToast('Profile picture updated!');
-                    } else {
-                        showToast('Failed to save picture', 'error');
-                    }
-                } catch (err) {
-                    showToast('Error saving picture', 'error');
-                }
-            };
-            reader.readAsDataURL(file);
-        });
-
-        return;
-    }
 
     // Build conditional fields HTML
     let condFieldsHtml = '';
@@ -760,6 +662,7 @@ async function renderProfilePage(host) {
                     ${state.user.designation ? `<span class="routine-day-badge">${state.user.designation}</span>` : ''}
                 </div>
                 <div class="profile-kpi-stats-grid">
+                    ${state.user.role !== 'ADMIN' ? `
                     <div class="profile-kpi-box">
                         <span class="lbl">ID No.</span>
                         <span class="val">${state.user.idNo || 'N/A'}</span>
@@ -768,6 +671,7 @@ async function renderProfilePage(host) {
                         <span class="lbl">Section</span>
                         <span class="val">${state.user.section || 'N/A'}</span>
                     </div>
+                    ` : ''}
                     <div class="profile-kpi-box">
                         <span class="lbl">Role</span>
                         <span class="val">${state.user.role}</span>
@@ -795,6 +699,7 @@ async function renderProfilePage(host) {
                         <label for="profile-email">Email Address <span class="sensitive-field-indicator" title="Requires admin approval"><i class="fa-solid fa-lock" style="color: var(--danger); margin-left: 0.3rem;"></i></span></label>
                         <input type="email" id="profile-email" class="form-input" required value="${state.user.email}">
                     </div>
+                    ${state.user.role !== 'ADMIN' ? `
                     <div class="form-group" style="margin-top: 0.8rem;">
                         <label for="profile-idno">ID Number <span class="sensitive-field-indicator" title="Requires admin approval"><i class="fa-solid fa-lock" style="color: var(--danger); margin-left: 0.3rem;"></i></span></label>
                         <input type="text" id="profile-idno" class="form-input" required value="${state.user.idNo || ''}">
@@ -803,6 +708,7 @@ async function renderProfilePage(host) {
                         <label for="profile-department">Department <span class="sensitive-field-indicator" title="Requires admin approval"><i class="fa-solid fa-lock" style="color: var(--danger); margin-left: 0.3rem;"></i></span></label>
                         <select id="profile-department" required>${departments.map(d => `<option value="${d}" ${state.user.department === d ? 'selected' : ''}>${d}</option>`).join('')}</select>
                     </div>
+                    ` : ''}
                     
                     <div id="profile-conditional-fields">${condFieldsHtml}</div>
                     
@@ -859,8 +765,8 @@ async function renderProfilePage(host) {
         e.preventDefault();
         const fullName = document.getElementById('profile-fullname').value;
         const email = document.getElementById('profile-email').value;
-        const idNo = document.getElementById('profile-idno').value;
-        const department = document.getElementById('profile-department').value;
+        const idNo = document.getElementById('profile-idno') ? document.getElementById('profile-idno').value : null;
+        const department = document.getElementById('profile-department') ? document.getElementById('profile-department').value : null;
         
         const semester = document.getElementById('profile-semester') ? document.getElementById('profile-semester').value : null;
         const batch = document.getElementById('profile-Batch') ? document.getElementById('profile-Batch').value : null;
@@ -897,14 +803,26 @@ async function logout() {
     }
     state.user = null;
     localStorage.removeItem('currentUniversityDomain');
+    window.history.pushState({}, '', '/');
     document.getElementById('sidebar').style.display = 'none';
     renderLandingPage();
     showToast("Logged out successfully");
 }
 
 // --- AUTH PAGE RENDER ---
-function renderAuthPage() {
+async function renderAuthPage() {
     clearAllIntervals();
+    const sidebar = document.getElementById('sidebar');
+    const mobileHeader = document.getElementById('mobile-header');
+    if (sidebar) sidebar.style.display = 'none';
+    if (mobileHeader) mobileHeader.style.display = 'none';
+
+    let logoUrl = '/learnx_logo.png?v=3';
+    let uniName = 'LearnX';
+    let welcomeMsg = 'Academic ease, skip the complex, and master your path with LearnX!';
+
+    state.currentUniversity = null;
+
     const host = document.getElementById('main-view-host');
     host.innerHTML = `
         <div class="landing-container">
@@ -920,10 +838,10 @@ function renderAuthPage() {
                     <div class="fluid-blob fluid-blob-3"></div>
                     
                     <div class="glass-panel" style="position: relative; z-index: 10; max-width: 320px; padding: 2rem; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); text-align: center; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.15); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);">
-                        <img src="learnx_logo.png?v=3" alt="LearnX Logo" style="width: 70px; height: 70px; object-fit: contain; background: #fff; border-radius: 50%; padding: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); margin-bottom: 1.2rem;">
-                        <h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.4rem; color: #fff; margin-bottom: 0.5rem; font-weight: 600;">Secure Access</h3>
+                        <img src="${logoUrl}" alt="${uniName} Logo" style="width: 70px; height: 70px; object-fit: contain; background: #fff; border-radius: 50%; padding: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); margin-bottom: 1.2rem;">
+                        <h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.4rem; color: #fff; margin-bottom: 0.5rem; font-weight: 600;">${uniName}</h3>
                         <p style="font-family: 'Outfit', sans-serif; font-size: 0.88rem; color: rgba(255, 255, 255, 0.7); line-height: 1.45; margin: 0;">
-                            Your data is safe under LearnX authentication protocols.
+                            ${welcomeMsg}
                         </p>
                     </div>
                 </div>
@@ -935,20 +853,19 @@ function renderAuthPage() {
 
 function showLoginForm() {
     const card = document.getElementById('auth-card-content');
-    const currentDomain = localStorage.getItem('currentUniversityDomain');
-    const brandingName = currentDomain ? currentDomain.split('.')[0].toUpperCase() : 'LearnX';
+    const logoUrl = '/learnx_logo.png?v=3';
     
     card.innerHTML = `
         <div style="display: flex; flex-direction: column; gap: 1.2rem; max-width: 400px; margin: auto auto; width: 100%; padding: 1.5rem 0;">
             <div style="display: flex; justify-content: flex-start; align-items: center; gap: 0.5rem;">
-                <img src="learnx_logo.png?v=3" alt="LearnX Logo" style="width: 44px; height: 44px; object-fit: contain;">
-                ${currentDomain ? `<span style="font-family:'Space Grotesk'; font-size:1.3rem; font-weight:700; color:#11212D;">${brandingName} Portal</span>` : ''}
+                <img src="${logoUrl}" alt="LearnX Logo" style="width: 44px; height: 44px; object-fit: contain;">
+                <span style="font-family:'Space Grotesk'; font-size:1.3rem; font-weight:700; color:#11212D;">LearnX</span>
             </div>
             
             <div class="auth-header" style="text-align: left;">
                 <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 2.1rem; font-weight: 800; color: #06141B; margin: 0 0 0.4rem 0; letter-spacing: -0.5px;">Welcome!</h2>
                 <p style="color: #4A5C6A; font-size: 0.95rem; margin: 0; line-height: 1.35;">
-                    ${currentDomain ? `Please sign in to access your ${brandingName} academic workspace.` : 'Academic ease, skip the complex, and master your path with LearnX!'}
+                    Academic ease, skip the complex, and master your path with LearnX!
                 </p>
             </div>
             
@@ -970,33 +887,23 @@ function showLoginForm() {
             <p style="text-align: center; color: #4A5C6A; font-size: 0.88rem; margin: 0.5rem 0 0 0;">
                 Don't have an account? <a id="link-goto-signup" style="color: #11212D; text-decoration: none; font-weight: 700; cursor: pointer;">Sign Up</a>
             </p>
-            
-            ${currentDomain ? `
-                <a id="link-switch-university" style="text-align: center; color: #4A5C6A; font-size: 0.85rem; text-decoration: underline; cursor: pointer; margin-top: 0.8rem; display: block;">
-                    <i class="fa-solid fa-arrow-left-long"></i> Switch University / View Directory
-                </a>
-            ` : ''}
         </div>
     `;
 
     document.getElementById('form-login').addEventListener('submit', handleLogin);
     document.getElementById('link-goto-signup').addEventListener('click', showSignupForm);
     document.getElementById('link-goto-recovery').addEventListener('click', showRecoveryForm);
-    
-    if (currentDomain) {
-        document.getElementById('link-switch-university').addEventListener('click', () => {
-            localStorage.removeItem('currentUniversityDomain');
-            window.location.reload();
-        });
-    }
 }
 
 function showRecoveryForm() {
     const card = document.getElementById('auth-card-content');
+    const logoUrl = '/learnx_logo.png?v=3';
+
     card.innerHTML = `
         <div style="display: flex; flex-direction: column; gap: 1.2rem; max-width: 400px; margin: 0 auto; width: 100%;">
-            <div style="display: flex; justify-content: flex-start; align-items: center;">
-                <img src="learnx_logo.png?v=3" alt="LearnX Logo" style="width: 44px; height: 44px; object-fit: contain;">
+            <div style="display: flex; justify-content: flex-start; align-items: center; gap: 0.5rem;">
+                <img src="${logoUrl}" alt="LearnX Logo" style="width: 44px; height: 44px; object-fit: contain;">
+                <span style="font-family:'Space Grotesk'; font-size:1.3rem; font-weight:700; color:#11212D;">LearnX</span>
             </div>
             
             <div class="auth-header" style="text-align: left;">
@@ -1007,7 +914,7 @@ function showRecoveryForm() {
             <form id="form-recovery-request" style="display: flex; flex-direction: column; gap: 0.9rem;">
                 <div class="form-group" style="margin-bottom: 0;">
                     <label for="recovery-email" style="font-weight: 600; color: #253745; font-size: 0.9rem; margin-bottom: 0.3rem; display: block;">Email or Username</label>
-                    <input type="text" id="recovery-email" class="form-input" required placeholder="e.g. student1@ustc.edu or student1" style="border-radius: 20px; border: 1px solid #9BA8AB; padding: 0.65rem 1rem;">
+                    <input type="text" id="recovery-email" class="form-input" required placeholder="e.g. student1@email.com or student1" style="border-radius: 20px; border: 1px solid #9BA8AB; padding: 0.65rem 1rem;">
                 </div>
                 <button type="submit" class="btn" style="margin-top: 0.4rem; background: #11212D; color: #fff; border: none; border-radius: 30px; padding: 0.75rem; font-weight: 600; cursor: pointer; font-size: 0.95rem; width: 100%;">
                     Request Verification Code
@@ -1099,31 +1006,54 @@ async function showSignupForm() {
     const card = document.getElementById('auth-card-content');
     card.innerHTML = `<div style="text-align:center; padding: 2rem;"><i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem; color: var(--accent-blue);"></i><p style="margin-top:1rem; color: var(--text-secondary);">Loading form configuration...</p></div>`;
 
+    const logoUrl = '/learnx_logo.png?v=3';
+
     let departments = [];
     let semesters = [];
     let Batchs = [];
     let designations = [];
+    let sections = [];
 
     try {
-        const res = await fetch('/api/metadata');
-        if (res.ok) {
-            const options = await res.json();
-            departments = options.filter(o => o.type === 'DEPARTMENT').map(o => o.value);
-            semesters = options.filter(o => o.type === 'SEMESTER').map(o => o.value);
-            Batchs = options.filter(o => o.type === 'BATCH').map(o => o.value);
-            designations = options.filter(o => o.type === 'DESIGNATION').map(o => o.value);
+        const [resDepts, resSemesters, resBatches, resDesignations, resSections] = await Promise.all([
+            apiFetch('/api/admin/metadata?type=DEPARTMENT'),
+            apiFetch('/api/admin/metadata?type=SEMESTER'),
+            apiFetch('/api/admin/metadata?type=BATCH'),
+            apiFetch('/api/admin/metadata?type=DESIGNATION'),
+            apiFetch('/api/admin/metadata?type=SECTION')
+        ]);
+        if (resDepts && resDepts.ok) {
+            const list = await resDepts.json();
+            departments = list.map(o => o.value);
+        }
+        if (resSemesters && resSemesters.ok) {
+            const list = await resSemesters.json();
+            semesters = list.map(o => o.value);
+        }
+        if (resBatches && resBatches.ok) {
+            const list = await resBatches.json();
+            Batchs = list.map(o => o.value);
+        }
+        if (resDesignations && resDesignations.ok) {
+            const list = await resDesignations.json();
+            designations = list.map(o => o.value);
+        }
+        if (resSections && resSections.ok) {
+            const list = await resSections.json();
+            sections = list.map(o => o.value);
         }
     } catch (e) {
         console.error("Failed to load metadata", e);
     }
 
     card.innerHTML = `
-        <div style="display: flex; flex-direction: column; gap: 1rem; max-width: 400px; margin: auto auto; width: 100%; padding: 1.5rem 0;">
-            <div style="display: flex; justify-content: flex-start; align-items: center;">
-                <img src="learnx_logo.png?v=3" alt="LearnX Logo" style="width: 44px; height: 44px; object-fit: contain;">
+        <div style="display: flex; flex-direction: column; gap: 1rem; max-width: 400px; margin: auto auto; width: 100%; padding: 1.5rem 0; text-align: left;">
+            <div style="display: flex; justify-content: flex-start; align-items: center; gap: 0.5rem;">
+                <img src="${logoUrl}" alt="LearnX Logo" style="width: 44px; height: 44px; object-fit: contain;">
+                <span style="font-family:'Space Grotesk'; font-size:1.3rem; font-weight:700; color:#11212D;">LearnX</span>
             </div>
             
-            <div class="auth-header" style="text-align: left;">
+            <div class="auth-header">
                 <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 2.1rem; font-weight: 800; color: #06141B; margin: 0 0 0.2rem 0; letter-spacing: -0.5px;">Create Account</h2>
                 <p style="color: #4A5C6A; font-size: 0.92rem; margin: 0; line-height: 1.35;">Register a student, class representative, or teacher account</p>
             </div>
@@ -1183,10 +1113,19 @@ async function showSignupForm() {
     const updateConditionalFields = () => {
         const role = roleSelect.value;
         if (role === 'STUDENT' || role === 'CR') {
+            const sectionFieldHtml = sections.length > 0 ? `
+                <select id="signup-section" required style="border-radius: 20px; border: 1px solid #9BA8AB; padding: 0.55rem 0.95rem; background: #fff; width: 100%;">
+                    <option value="">Select Section</option>
+                    ${sections.map(s => `<option value="${s}">${s}</option>`).join('')}
+                </select>
+            ` : `
+                <input type="text" id="signup-section" class="form-input" required placeholder="e.g. A" style="border-radius: 20px; border: 1px solid #9BA8AB; padding: 0.55rem 0.95rem;">
+            `;
+
             condContainer.innerHTML = `
                 <div class="form-group" style="margin-bottom: 0;">
                     <label for="signup-email" style="font-weight: 600; color: #253745; font-size: 0.88rem; margin-bottom: 0.25rem; display: block;">Email Address</label>
-                    <input type="email" id="signup-email" class="form-input" required placeholder="e.g. name@ustc.edu" style="border-radius: 20px; border: 1px solid #9BA8AB; padding: 0.55rem 0.95rem;">
+                    <input type="email" id="signup-email" class="form-input" required placeholder="e.g. name@email.com" style="border-radius: 20px; border: 1px solid #9BA8AB; padding: 0.55rem 0.95rem;">
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
                     <label for="signup-semester" style="font-weight: 600; color: #253745; font-size: 0.88rem; margin-bottom: 0.25rem; display: block;">Semester</label>
@@ -1204,14 +1143,14 @@ async function showSignupForm() {
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
                     <label for="signup-section" style="font-weight: 600; color: #253745; font-size: 0.88rem; margin-bottom: 0.25rem; display: block;">Section</label>
-                    <input type="text" id="signup-section" class="form-input" required placeholder="e.g. A" style="border-radius: 20px; border: 1px solid #9BA8AB; padding: 0.55rem 0.95rem;">
+                    ${sectionFieldHtml}
                 </div>
             `;
         } else if (role === 'TEACHER') {
             condContainer.innerHTML = `
                 <div class="form-group" style="margin-bottom: 0;">
                     <label for="signup-email" style="font-weight: 600; color: #253745; font-size: 0.88rem; margin-bottom: 0.25rem; display: block;">Email Address</label>
-                    <input type="email" id="signup-email" class="form-input" required placeholder="e.g. name@ustc.edu" style="border-radius: 20px; border: 1px solid #9BA8AB; padding: 0.55rem 0.95rem;">
+                    <input type="email" id="signup-email" class="form-input" required placeholder="e.g. name@email.com" style="border-radius: 20px; border: 1px solid #9BA8AB; padding: 0.55rem 0.95rem;">
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
                     <label for="signup-designation" style="font-weight: 600; color: #253745; font-size: 0.88rem; margin-bottom: 0.25rem; display: block;">Designation</label>
@@ -1237,13 +1176,13 @@ async function handleLogin(e) {
     const password = document.getElementById('login-password').value;
 
     try {
-        const res = await fetch('/api/auth/login', {
+        const res = await apiFetch('/api/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password })
         });
 
-        if (res.ok) {
+        if (res && res.ok) {
             state.user = await res.json();
             setupSidebar();
             if (state.user.role === 'SYSTEM_ADMIN') {
@@ -1252,7 +1191,7 @@ async function handleLogin(e) {
                 switchView('dashboard');
             }
             showToast(`Welcome back, ${state.user.fullName}!`);
-        } else {
+        } else if (res) {
             let errMsg = "Login failed";
             try {
                 const err = await res.json();
@@ -1286,13 +1225,13 @@ async function handleSignup(e) {
         const designationEl = document.getElementById('signup-designation');
         const designation = designationEl ? designationEl.value : null;
 
-        const res = await fetch('/api/auth/signup', {
+        const res = await apiFetch('/api/auth/signup', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ fullName, username, email, password, role, idNo, department, semester, batch, section, designation })
         });
 
-        if (res.ok) {
+        if (res && res.ok) {
             const data = await res.json();
             const card = document.getElementById('auth-card-content');
             card.innerHTML = `
@@ -3337,7 +3276,7 @@ async function renderAdminApprovals(container) {
                         </div>
                         <div class="form-group" style="margin-top: 0.5rem;">
                             <label for="adm-email">Email Address</label>
-                            <input type="email" id="adm-email" class="form-input" required placeholder="e.g. john@ustc.edu">
+                            <input type="email" id="adm-email" class="form-input" required placeholder="e.g. john@email.com">
                         </div>
                         <div class="form-group" style="margin-top: 0.5rem;">
                             <label for="adm-password">Password</label>
@@ -3779,117 +3718,6 @@ async function loadAnnouncementsFeed() {
     });
 }
 
-async function renderSystemConfig(host) {
-    host.innerHTML = `
-        <div class="view-header">
-            <div class="view-title">
-                <h2>Settings</h2>
-            </div>
-        </div>
-        <div class="glass-panel" style="padding: 2.5rem; border: 1px solid var(--glass-border);">
-            <h3>Add New Batch</h3>
-            <form id="form-add-batch" style="display: flex; gap: 1rem; align-items: flex-end; margin-top: 1rem; margin-bottom: 2.5rem;">
-                <div class="form-group" style="margin-bottom: 0; flex-grow: 1;">
-                    <label for="new-batch-name">Batch Name/Number (e.g. 21)</label>
-                    <input type="text" id="new-batch-name" class="form-input" required placeholder="Enter batch number...">
-                </div>
-                <button type="submit" class="btn" style="width: auto;"><i class="fa-solid fa-plus"></i> Add Batch</button>
-            </form>
-            
-            <h3>Active Student Batches</h3>
-            <!-- Batches list description removed -->
-            <div id="batch-list-container">Loading batches...</div>
-        </div>
-    `;
-
-    document.getElementById('form-add-batch').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const batchName = document.getElementById('new-batch-name').value.trim();
-        try {
-            const res = await apiFetch('/api/metadata', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ type: 'BATCH', value: batchName })
-            });
-            if (res && res.ok) {
-                showToast(`Batch ${batchName} added successfully.`);
-                document.getElementById('new-batch-name').value = '';
-                loadBatches();
-            } else if (res) {
-                const err = await res.json();
-                showToast(err.error || 'Failed to add batch', 'error');
-            }
-        } catch (err) {
-            showToast('Error connecting to server', 'error');
-        }
-    });
-
-    async function loadBatches() {
-        const container = document.getElementById('batch-list-container');
-        try {
-            const res = await fetch('/api/metadata');
-            if (res.ok) {
-                const metadata = await res.json();
-                const batches = metadata.filter(m => m.type === 'BATCH');
-                
-                // Sort batches numerically
-                batches.sort((a, b) => {
-                    const numA = parseInt(a.value) || 0;
-                    const numB = parseInt(b.value) || 0;
-                    return numA - numB;
-                });
-
-                if (batches.length === 0) {
-                    container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 1.5rem;">No active student batches defined.</p>';
-                    return;
-                }
-
-                let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem; max-height: 400px; overflow-y: auto; padding: 0.5rem 0.2rem;">';
-                batches.forEach(m => {
-                    html += `
-                        <div class="glass-panel" style="padding: 0.75rem 1rem; border: 1px solid var(--glass-border); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); border-radius: 12px; transition: all 0.2s;">
-                            <span style="font-weight: 600; font-family: \'Space Grotesk\', sans-serif;">Batch ${m.value}</span>
-                            <button class="btn btn-danger btn-delete-batch" data-id="${m.id}" data-value="${m.value}" style="padding: 0.35rem 0.5rem; font-size: 0.75rem; width: auto; min-width: 0; box-shadow: none; border-radius: 8px;">
-                                <i class="fa-solid fa-trash-can"></i>
-                            </button>
-                        </div>
-                    `;
-                });
-                html += '</div>';
-                container.innerHTML = html;
-
-                // Add delete listeners
-                container.querySelectorAll('.btn-delete-batch').forEach(btn => {
-                    btn.addEventListener('click', async (e) => {
-                        const id = e.currentTarget.getAttribute('data-id');
-                        const val = e.currentTarget.getAttribute('data-value');
-                        if (confirm(`Are you sure you want to delete "Batch ${val}"?`)) {
-                            try {
-                                const response = await apiFetch(`/api/metadata/${id}`, { method: 'DELETE' });
-                                if (response && response.ok) {
-                                    showToast(`Batch ${val} deleted successfully!`);
-                                    loadBatches();
-                                } else if (response) {
-                                    const err = await response.json();
-                                    showToast(err.error || 'Failed to delete batch', 'error');
-                                }
-                            } catch (err) {
-                                showToast('Error connecting to server', 'error');
-                            }
-                        }
-                    });
-                });
-            } else {
-                container.innerHTML = '<p style="color: var(--danger);">Failed to load metadata.</p>';
-            }
-        } catch (err) {
-            container.innerHTML = '<p style="color: var(--danger);">Error connecting to server.</p>';
-        }
-    }
-    
-    loadBatches();
-}
-
 
 
 
@@ -4261,22 +4089,22 @@ function renderScheduleTab(tabName) {
 // --- Site Owner (Master Admin) Panel ---
 // ============================================================================
 async function renderMasterAdminPanel(host) {
-    let activeTab = 'list';
+    let activeTab = 'bugs';
     
     function render() {
         host.innerHTML = `
             <div style="padding: 1.5rem; max-width: 1200px; margin: 0 auto; width: 100%;">
                 <div style="margin-bottom: 1.5rem;">
                     <h1 style="font-family:'Space Grotesk',sans-serif; font-size:1.8rem; margin:0 0 0.5rem 0; color:var(--accent-blue);">Site Owner Master Dashboard</h1>
-                    <p style="color:var(--text-secondary); margin:0; font-size:0.95rem;">Manage registered universities, domains, logos, and admin accounts.</p>
+                    <p style="color:var(--text-secondary); margin:0; font-size:0.95rem;">Review system bug reports and send mail broadcasts to users.</p>
                 </div>
                 
                 <div class="admin-tabs">
-                    <button class="admin-tab-btn ${activeTab === 'list' ? 'active' : ''}" id="tab-master-list">
-                        <i class="fa-solid fa-list-check"></i> Manage Universities
+                    <button class="admin-tab-btn ${activeTab === 'bugs' ? 'active' : ''}" id="tab-master-bugs">
+                        <i class="fa-solid fa-bug"></i> Bug Reports
                     </button>
-                    <button class="admin-tab-btn ${activeTab === 'register' ? 'active' : ''}" id="tab-master-register">
-                        <i class="fa-solid fa-plus"></i> Register University
+                    <button class="admin-tab-btn ${activeTab === 'broadcast' ? 'active' : ''}" id="tab-master-broadcast">
+                        <i class="fa-solid fa-paper-plane"></i> Broadcast Email
                     </button>
                 </div>
                 
@@ -4284,13 +4112,13 @@ async function renderMasterAdminPanel(host) {
             </div>
         `;
         
-        document.getElementById('tab-master-list').addEventListener('click', () => { activeTab = 'list'; render(); });
-        document.getElementById('tab-master-register').addEventListener('click', () => { activeTab = 'register'; render(); });
+        document.getElementById('tab-master-bugs').addEventListener('click', () => { activeTab = 'bugs'; render(); });
+        document.getElementById('tab-master-broadcast').addEventListener('click', () => { activeTab = 'broadcast'; render(); });
         
-        if (activeTab === 'list') {
-            loadMasterUniversityList();
-        } else {
-            loadMasterRegisterForm();
+        if (activeTab === 'bugs') {
+            loadMasterBugReports();
+        } else if (activeTab === 'broadcast') {
+            loadMasterBroadcastForm();
         }
     }
     
@@ -4500,7 +4328,7 @@ function showMasterUniAdminResetModal(uni) {
             <form id="form-reset-uni-admin" style="display:flex; flex-direction:column; gap:0.8rem;">
                 <div class="form-group">
                     <label style="font-weight:600; font-size:0.85rem;">Admin Username</label>
-                    <input type="text" id="reset-admin-username" class="form-input" required placeholder="e.g. admin_ustc">
+                    <input type="text" id="reset-admin-username" class="form-input" required placeholder="e.g. admin_user">
                 </div>
                 <div class="form-group">
                     <label style="font-weight:600; font-size:0.85rem;">New Admin Password</label>
@@ -4566,7 +4394,7 @@ function loadMasterRegisterForm() {
                 </div>
                 <div class="form-group">
                     <label style="font-weight:600; font-size:0.85rem;">Virtual Subdomain</label>
-                    <input type="text" id="reg-uni-domain" class="form-input" required placeholder="e.g. ustc.learnx.com">
+                    <input type="text" id="reg-uni-domain" class="form-input" required placeholder="e.g. myuniversity.learnx.com">
                 </div>
                 <div class="form-group">
                     <label style="font-weight:600; font-size:0.85rem;">Logo File</label>
@@ -4586,7 +4414,7 @@ function loadMasterRegisterForm() {
                     </div>
                     <div class="form-group">
                         <label style="font-weight:600; font-size:0.85rem;">Admin Email</label>
-                        <input type="email" id="reg-admin-email" class="form-input" required placeholder="admin@ustc.edu">
+                        <input type="email" id="reg-admin-email" class="form-input" required placeholder="admin@university.edu">
                     </div>
                 </div>
                 <div class="form-group">
@@ -4655,6 +4483,313 @@ function loadMasterRegisterForm() {
     });
 }
 
+async function loadMasterBugReports() {
+    const container = document.getElementById('master-panel-content');
+    container.innerHTML = `<div class="admin-setup-card"><p>Loading bug reports...</p></div>`;
+
+    try {
+        const res = await apiFetch('/api/master/bugs');
+        if (res && res.ok) {
+            const list = await res.json();
+            if (list.length === 0) {
+                container.innerHTML = `
+                    <div class="admin-setup-card" style="text-align:center; padding: 3rem; background: rgba(255, 255, 255, 0.45);">
+                        <i class="fa-solid fa-circle-check" style="font-size: 3rem; color: var(--success); margin-bottom: 1rem;"></i>
+                        <h3>All Clean! No Bug Reports</h3>
+                        <p style="color: var(--text-secondary);">No bugs have been reported in the system.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = `
+                <div class="admin-setup-card" style="background: rgba(255, 255, 255, 0.45); padding: 1.5rem;">
+                    <h3 style="margin-bottom: 1rem; font-family:'Space Grotesk',sans-serif; font-size: 1.3rem;"><i class="fa-solid fa-bug"></i> User Reported Bugs</h3>
+                    <div style="overflow-x:auto;">
+                        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+                            <thead>
+                                <tr style="border-bottom: 2px solid var(--glass-border); color: var(--accent-blue);">
+                                    <th style="padding: 0.75rem;">Bug Title & Description</th>
+                                    <th style="padding: 0.75rem;">Reported By</th>
+                                    <th style="padding: 0.75rem;">Date</th>
+                                    <th style="padding: 0.75rem;">Status</th>
+                                    <th style="padding: 0.75rem; text-align: right;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+            `;
+
+            list.forEach(bug => {
+                const badgeColors = {
+                    'PENDING': 'background: rgba(255, 149, 0, 0.15); border-color: rgba(255, 149, 0, 0.3); color: #ff9500;',
+                    'REVIEWED': 'background: rgba(0, 122, 255, 0.15); border-color: rgba(0, 122, 255, 0.3); color: #007aff;',
+                    'RESOLVED': 'background: rgba(52, 199, 89, 0.15); border-color: rgba(52, 199, 89, 0.3); color: #34c759;'
+                };
+                const badgeStyle = badgeColors[bug.status] || 'background: rgba(0,0,0,0.1); color: #555;';
+
+                let actionButtons = '';
+                if (bug.status === 'PENDING') {
+                    actionButtons = `
+                        <button class="btn btn-secondary btn-bug-action" data-id="${bug.id}" data-status="REVIEWED" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; margin-right: 0.3rem; border-radius: 8px;">Review</button>
+                        <button class="btn btn-secondary btn-bug-action" data-id="${bug.id}" data-status="RESOLVED" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; border-radius: 8px; background: var(--success); color: white;">Resolve</button>
+                    `;
+                } else if (bug.status === 'REVIEWED') {
+                    actionButtons = `
+                        <button class="btn btn-secondary btn-bug-action" data-id="${bug.id}" data-status="RESOLVED" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; border-radius: 8px; background: var(--success); color: white;">Resolve</button>
+                    `;
+                } else {
+                    actionButtons = `<span style="font-size: 0.8rem; color: var(--text-muted);"><i class="fa-solid fa-circle-check"></i> Closed</span>`;
+                }
+
+                html += `
+                    <tr style="border-bottom: 1px solid var(--glass-border); vertical-align: top;">
+                        <td style="padding: 0.75rem; max-width: 350px;">
+                            <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem;">${bug.title}</div>
+                            <div style="font-size: 0.8rem; color: var(--text-secondary); white-space: pre-wrap; line-height: 1.4;">${bug.description}</div>
+                        </td>
+                        <td style="padding: 0.75rem; font-size: 0.8rem; color: var(--text-secondary);">${bug.reportedBy}</td>
+                        <td style="padding: 0.75rem; font-size: 0.8rem; color: var(--text-muted);">${formatDateTime(bug.createdAt)}</td>
+                        <td style="padding: 0.75rem; vertical-align: middle;">
+                            <span class="routine-day-badge" style="font-size: 0.65rem; padding: 2px 6px; border-radius: 8px; ${badgeStyle}">${bug.status}</span>
+                        </td>
+                        <td style="padding: 0.75rem; text-align: right; vertical-align: middle; white-space: nowrap;">
+                            ${actionButtons}
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+
+            container.innerHTML = html;
+
+            // Wire buttons
+            container.querySelectorAll('.btn-bug-action').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const id = e.currentTarget.getAttribute('data-id');
+                    const status = e.currentTarget.getAttribute('data-status');
+                    try {
+                        const resUpdate = await apiFetch(`/api/master/bugs/${id}/status`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ status })
+                        });
+                        if (resUpdate && resUpdate.ok) {
+                            showToast(`Bug status updated to ${status}`);
+                            loadMasterBugReports();
+                        } else {
+                            showToast("Failed to update bug status", "error");
+                        }
+                    } catch (err) {
+                        showToast("Connection error", "error");
+                    }
+                });
+            });
+        } else {
+            container.innerHTML = `<div class="admin-setup-card"><p style="color:var(--danger);">Failed to load bug reports.</p></div>`;
+        }
+    } catch (err) {
+        container.innerHTML = `<div class="admin-setup-card"><p style="color:var(--danger);">Error loading bug reports from server.</p></div>`;
+    }
+}
+
+async function loadMasterBroadcastForm() {
+    const container = document.getElementById('uni-panel-content') || document.getElementById('master-panel-content');
+    container.innerHTML = `<div class="admin-setup-card"><p>Loading members list...</p></div>`;
+
+    try {
+        const res = await apiFetch('/api/master/users/emails');
+        if (!res || !res.ok) {
+            container.innerHTML = `<div class="admin-setup-card"><p style="color:var(--danger);">Failed to load registered members.</p></div>`;
+            return;
+        }
+
+        const members = await res.json();
+
+        container.innerHTML = `
+            <div class="admin-setup-card" style="background: rgba(255, 255, 255, 0.45); max-width: 800px; margin: 0 auto; padding: 1.5rem;">
+                <h3 style="margin-bottom:1rem; font-family:'Space Grotesk',sans-serif; font-size:1.3rem;"><i class="fa-solid fa-bullhorn"></i> Broadcast Email</h3>
+                
+                <form id="form-broadcast-email" style="display:flex; flex-direction:column; gap:1.2rem;">
+                    <div class="form-group">
+                        <label style="font-weight:600; font-size:0.85rem;">Email Subject *</label>
+                        <input type="text" id="broadcast-subject" class="form-input" required placeholder="Enter email subject header">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label style="font-weight:600; font-size:0.85rem;">Message Content *</label>
+                        <textarea id="broadcast-content" class="form-input" required rows="6" placeholder="Write your broadcast message body here..." style="resize:vertical;"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="font-weight:600; font-size:0.85rem;">Recipients Configuration *</label>
+                        <div style="display:flex; gap:1.5rem; flex-wrap:wrap; margin-top:0.4rem;">
+                            <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
+                                <input type="radio" name="recipient-mode" value="all" checked id="radio-mode-all">
+                                Send to All Registered Members (${members.length})
+                            </label>
+                            <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
+                                <input type="radio" name="recipient-mode" value="specific" id="radio-mode-specific">
+                                Select Specific Recipients
+                            </label>
+                            <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
+                                <input type="radio" name="recipient-mode" value="custom" id="radio-mode-custom">
+                                Send to Custom Emails
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Custom Email Input Container -->
+                    <div id="custom-emails-container" style="display:none; flex-direction:column; gap:0.4rem;">
+                        <label style="font-weight:600; font-size:0.85rem;">Custom Email Addresses (Comma-separated) *</label>
+                        <textarea id="broadcast-custom-emails" class="form-input" rows="3" placeholder="e.g. user1@gmail.com, user2@yahoo.com" style="resize:vertical;"></textarea>
+                    </div>
+
+                    <!-- Specific Recipient Selection List -->
+                    <div id="recipient-selection-container" style="display:none; flex-direction:column; gap:0.8rem; border:1px solid var(--glass-border); border-radius:16px; padding:1rem; background:rgba(255,255,255,0.2);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem;">
+                            <span style="font-size:0.85rem; font-weight:700;">Select Members to Email:</span>
+                            <input type="text" id="member-search" class="form-input" placeholder="Search by name or email..." style="max-width:300px; padding:0.4rem 0.8rem; font-size:0.8rem; border-radius:12px;">
+                        </div>
+                        
+                        <div style="max-height:220px; overflow-y:auto; display:flex; flex-direction:column; gap:0.4rem; padding-right:0.2rem;" id="members-list-host">
+                            ${members.map(m => `
+                                <label class="member-row" style="display:flex; align-items:center; justify-content:space-between; padding:0.4rem 0.6rem; border-radius:8px; background:rgba(255,255,255,0.15); font-size:0.85rem; cursor:pointer; transition:background 0.2s;" data-search="${(m.fullName + ' ' + m.email + ' ' + m.role).toLowerCase()}">
+                                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                                        <input type="checkbox" class="chk-member-recipient" value="${m.email}">
+                                        <span style="font-weight:600;">${m.fullName}</span>
+                                        <span style="color:var(--text-muted); font-size:0.75rem;">(${m.email})</span>
+                                    </div>
+                                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                                        <span class="routine-day-badge" style="font-size:0.6rem; background:rgba(0,113,227,0.06); padding:1px 6px; border-radius:8px; font-weight:600;">${m.role}</span>
+                                    </div>
+                                </label>
+                            `).join('')}
+                        </div>
+                        <div style="display:flex; gap:0.5rem; font-size:0.75rem; justify-content:flex-end;">
+                            <button type="button" class="btn" id="btn-select-all-members" style="padding:0.25rem 0.5rem; font-size:0.75rem; width:auto; min-width:0; background:rgba(0,0,0,0.05); color:var(--text-primary);">Select All</button>
+                            <button type="button" class="btn" id="btn-deselect-all-members" style="padding:0.25rem 0.5rem; font-size:0.75rem; width:auto; min-width:0; background:rgba(0,0,0,0.05); color:var(--text-primary);">Clear All</button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn" style="margin-top:0.5rem; background:var(--accent-blue); color:#fff; border:none; border-radius:30px; padding:0.75rem; font-weight:600; cursor:pointer;">
+                        <i class="fa-solid fa-paper-plane"></i> Send Email Broadcast
+                    </button>
+                </form>
+            </div>
+        `;
+
+        const containerSel = container.querySelector('#recipient-selection-container');
+        const containerCustom = container.querySelector('#custom-emails-container');
+        const radioAll = container.querySelector('#radio-mode-all');
+        const radioSpecific = container.querySelector('#radio-mode-specific');
+        const radioCustom = container.querySelector('#radio-mode-custom');
+        const searchInput = container.querySelector('#member-search');
+        const listHost = container.querySelector('#members-list-host');
+
+        radioAll.addEventListener('change', () => {
+            containerSel.style.display = 'none';
+            containerCustom.style.display = 'none';
+        });
+        radioSpecific.addEventListener('change', () => {
+            containerSel.style.display = 'flex';
+            containerCustom.style.display = 'none';
+        });
+        radioCustom.addEventListener('change', () => {
+            containerSel.style.display = 'none';
+            containerCustom.style.display = 'flex';
+        });
+
+        // Search Filter
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            listHost.querySelectorAll('.member-row').forEach(row => {
+                const text = row.getAttribute('data-search');
+                if (text.includes(query)) {
+                    row.style.display = 'flex';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+
+        // Select All / Clear All
+        container.querySelector('#btn-select-all-members').addEventListener('click', () => {
+            listHost.querySelectorAll('.chk-member-recipient').forEach(chk => {
+                if (chk.closest('.member-row').style.display !== 'none') {
+                    chk.checked = true;
+                }
+            });
+        });
+        container.querySelector('#btn-deselect-all-members').addEventListener('click', () => {
+            listHost.querySelectorAll('.chk-member-recipient').forEach(chk => {
+                chk.checked = false;
+            });
+        });
+
+        // Form Submission
+        container.querySelector('#form-broadcast-email').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const subject = container.querySelector('#broadcast-subject').value;
+            const content = container.querySelector('#broadcast-content').value;
+            const isSpecific = radioSpecific.checked;
+
+            let recipientEmails = [];
+            if (isSpecific) {
+                listHost.querySelectorAll('.chk-member-recipient:checked').forEach(chk => {
+                    recipientEmails.push(chk.value);
+                });
+                if (recipientEmails.length === 0) {
+                    showToast("Please select at least one recipient.", "error");
+                    return;
+                }
+            } else if (radioCustom.checked) {
+                const customInput = container.querySelector('#broadcast-custom-emails').value;
+                if (!customInput.trim()) {
+                    showToast("Please enter at least one custom email address.", "error");
+                    return;
+                }
+                recipientEmails = customInput.split(',')
+                    .map(em => em.trim())
+                    .filter(em => em.length > 0 && em.includes('@'));
+                if (recipientEmails.length === 0) {
+                    showToast("Please enter valid email addresses containing '@'.", "error");
+                    return;
+                }
+            }
+
+            try {
+                showToast("Sending broadcast emails...");
+                const resSend = await apiFetch('/api/master/send-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ subject, content, recipientEmails })
+                });
+
+                if (resSend && resSend.ok) {
+                    const data = await resSend.json();
+                    showToast(`Broadcast complete! Sent: ${data.successCount}, Failed: ${data.failCount}`);
+                    container.querySelector('#form-broadcast-email').reset();
+                    containerSel.style.display = 'none';
+                } else {
+                    const err = await resSend.json();
+                    showToast(err.error || "Failed to send broadcast.", "error");
+                }
+            } catch (err) {
+                showToast("Network connection error", "error");
+            }
+        });
+
+    } catch (err) {
+        container.innerHTML = `<div class="admin-setup-card"><p style="color:var(--danger);">Error loading registered members from server.</p></div>`;
+    }
+}
+
 // ============================================================================
 // --- University Admin Panel ---
 // ============================================================================
@@ -4685,6 +4820,9 @@ async function renderUniAdminPanel(host) {
                     <button class="admin-tab-btn ${activeTab === 'promotion' ? 'active' : ''}" id="tab-uni-promotion">
                         <i class="fa-solid fa-arrow-up-right-dots"></i> Class Promotion
                     </button>
+                    <button class="admin-tab-btn ${activeTab === 'broadcast' ? 'active' : ''}" id="tab-uni-broadcast">
+                        <i class="fa-solid fa-paper-plane"></i> Broadcast Email
+                    </button>
                 </div>
                 
                 <div id="uni-panel-content"></div>
@@ -4696,6 +4834,7 @@ async function renderUniAdminPanel(host) {
         document.getElementById('tab-uni-syllabus').addEventListener('click', () => { activeTab = 'syllabus'; render(); });
         document.getElementById('tab-uni-planner').addEventListener('click', () => { activeTab = 'planner'; render(); });
         document.getElementById('tab-uni-promotion').addEventListener('click', () => { activeTab = 'promotion'; render(); });
+        document.getElementById('tab-uni-broadcast').addEventListener('click', () => { activeTab = 'broadcast'; render(); });
         
         switch (activeTab) {
             case 'setup':
@@ -4712,6 +4851,9 @@ async function renderUniAdminPanel(host) {
                 break;
             case 'promotion':
                 loadUniClassPromotion();
+                break;
+            case 'broadcast':
+                loadMasterBroadcastForm();
                 break;
         }
     }
@@ -4733,6 +4875,7 @@ async function loadUniAcademicSetup() {
                     <button class="btn btn-secondary filter-uni-meta" data-type="BATCH" style="width: auto; padding: 0.45rem 1rem; font-size: 0.85rem; border-radius:12px;">Batches</button>
                     <button class="btn btn-secondary filter-uni-meta" data-type="DESIGNATION" style="width: auto; padding: 0.45rem 1rem; font-size: 0.85rem; border-radius:12px;">Designations</button>
                     <button class="btn btn-secondary filter-uni-meta" data-type="MAJOR" style="width: auto; padding: 0.45rem 1rem; font-size: 0.85rem; border-radius:12px;">Majors</button>
+                    <button class="btn btn-secondary filter-uni-meta" data-type="SECTION" style="width: auto; padding: 0.45rem 1rem; font-size: 0.85rem; border-radius:12px;">Sections</button>
                 </div>
 
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.2rem;" class="responsive-grid">
@@ -4782,7 +4925,7 @@ async function loadUniAcademicSetup() {
                     </div>
                     <div class="form-group">
                         <label for="adm-email" style="font-weight:600; font-size:0.8rem;">Email Address</label>
-                        <input type="email" id="adm-email" class="form-input" required placeholder="e.g. helper@ustc.edu">
+                        <input type="email" id="adm-email" class="form-input" required placeholder="e.g. helper@email.com">
                     </div>
                     <div class="form-group">
                         <label for="adm-password" style="font-weight:600; font-size:0.8rem;">Password</label>
@@ -4934,7 +5077,7 @@ async function loadUniTeachersRegistry() {
                     </div>
                     <div class="form-group">
                         <label style="font-weight:600; font-size:0.85rem;">Email Address</label>
-                        <input type="email" id="t-email" class="form-input" required placeholder="rahman@ustc.edu">
+                        <input type="email" id="t-email" class="form-input" required placeholder="teacher@email.com">
                     </div>
                     <div class="form-group">
                         <label style="font-weight:600; font-size:0.85rem;">Department</label>
@@ -4974,11 +5117,12 @@ async function loadUniTeachersRegistry() {
                                 <th style="padding:0.6rem;">Email</th>
                                 <th style="padding:0.6rem;">Department</th>
                                 <th style="padding:0.6rem;">Designation</th>
+                                <th style="padding:0.6rem; text-align:right;">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="table-teachers-body">
                             <tr>
-                                <td colspan="5" style="padding:1rem; text-align:center;">Loading teachers...</td>
+                                <td colspan="6" style="padding:1rem; text-align:center;">Loading teachers...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -5034,7 +5178,7 @@ async function loadUniTeachersRegistry() {
             if (res && res.ok) {
                 const list = await res.json();
                 if (list.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="5" style="padding:1rem; text-align:center;">No teachers registered.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="6" style="padding:1rem; text-align:center;">No teachers registered.</td></tr>`;
                     return;
                 }
                 tbody.innerHTML = list.map(t => `
@@ -5044,11 +5188,34 @@ async function loadUniTeachersRegistry() {
                         <td style="padding:0.6rem;">${t.email}</td>
                         <td style="padding:0.6rem;">${t.department || 'N/A'}</td>
                         <td style="padding:0.6rem;"><span style="font-size:0.8rem; background:rgba(0,113,227,0.06); padding:2px 8px; border-radius:12px; font-weight:600;">${t.designation || 'Teacher'}</span></td>
+                        <td style="padding:0.6rem; text-align:right;">
+                            <button class="btn-icon btn-delete-teacher" data-id="${t.id}" data-name="${t.fullName}" style="color: var(--danger); cursor:pointer;">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </td>
                     </tr>
                 `).join('');
+
+                // Wire deletes
+                tbody.querySelectorAll('.btn-delete-teacher').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const id = e.currentTarget.getAttribute('data-id');
+                        const name = e.currentTarget.getAttribute('data-name');
+                        if (confirm(`Are you sure you want to delete teacher "${name}"? This will also remove all their class/course assignments and exams.`)) {
+                            const delRes = await apiFetch(`/api/admin/teachers/${id}`, { method: 'DELETE' });
+                            if (delRes && delRes.ok) {
+                                showToast("Teacher deleted successfully");
+                                loadTeachersList();
+                            } else {
+                                const err = await delRes.json();
+                                showToast(err.error || "Failed to delete teacher", "error");
+                            }
+                        }
+                    });
+                });
             }
         } catch(e) {
-            tbody.innerHTML = `<tr><td colspan="5" style="padding:1rem; text-align:center; color:var(--danger);">Error loading directory.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" style="padding:1rem; text-align:center; color:var(--danger);">Error loading directory.</td></tr>`;
         }
     }
     

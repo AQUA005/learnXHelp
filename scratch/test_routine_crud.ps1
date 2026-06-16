@@ -1,8 +1,8 @@
-# USTC LearnX - Programmatic Security and CRUD Validation for Routines
+# LearnX - Programmatic Security and CRUD Validation for Routines
 $baseUrl = "http://localhost:8080"
 
 Write-Host "=========================================================" -ForegroundColor Cyan
-Write-Host "USTC LearnX: Routine Schedule CRUD Programmatic Verification" -ForegroundColor Cyan
+Write-Host "LearnX: Routine Schedule CRUD Programmatic Verification" -ForegroundColor Cyan
 Write-Host "=========================================================" -ForegroundColor Cyan
 
 # Helper to log messages in colors

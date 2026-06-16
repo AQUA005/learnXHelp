@@ -11,4 +11,5 @@ public interface ExamSubmissionRepository extends JpaRepository<ExamSubmission, 
     List<ExamSubmission> findByExam(Exam exam);
     List<ExamSubmission> findByStudent(User student);
     Optional<ExamSubmission> findByExamAndStudent(Exam exam, User student);
+    void deleteByExam(Exam exam);
 }

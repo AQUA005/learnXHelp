@@ -47,15 +47,23 @@ public class ProfileController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "User not found"));
         }
 
+        boolean nameChanged = false;
+        if (request.getFullName() != null && !request.getFullName().trim().isEmpty() && !request.getFullName().equals(currentUser.getFullName())) {
+            currentUser.setFullName(request.getFullName().trim());
+            nameChanged = true;
+        }
+
         // Instantly update the non-sensitive profile photo if provided
         if (request.getProfilePicUrl() != null) {
             currentUser.setProfilePicUrl(request.getProfilePicUrl());
+        }
+
+        if (nameChanged || request.getProfilePicUrl() != null) {
             userRepository.save(currentUser);
         }
 
         boolean changed = false;
         
-        if (request.getFullName() != null && !request.getFullName().equals(currentUser.getFullName())) changed = true;
         if (request.getEmail() != null && !request.getEmail().equals(currentUser.getEmail())) changed = true;
         if (request.getIdNo() != null && !request.getIdNo().equals(currentUser.getIdNo())) changed = true;
         if (request.getDepartment() != null && !request.getDepartment().equals(currentUser.getDepartment())) changed = true;
@@ -66,14 +74,14 @@ public class ProfileController {
 
         if (!changed) {
             return ResponseEntity.ok(Map.of(
-                "message", "Profile picture updated successfully.",
+                "message", "Profile updated successfully.",
                 "user", currentUser
             ));
         }
 
         ProfileChangeRequest changeRequest = ProfileChangeRequest.builder()
                 .user(currentUser)
-                .newFullName(request.getFullName())
+                .newFullName(currentUser.getFullName())
                 .newEmail(request.getEmail())
                 .newIdNo(request.getIdNo())
                 .newDepartment(request.getDepartment())

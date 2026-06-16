@@ -10,4 +10,5 @@ import java.util.Optional;
 public interface ResourceReactionRepository extends JpaRepository<ResourceReaction, Long> {
     List<ResourceReaction> findByResourceId(Long resourceId);
     Optional<ResourceReaction> findByResourceIdAndUsername(Long resourceId, String username);
+    void deleteByResourceId(Long resourceId);
 }

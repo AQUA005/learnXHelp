@@ -6,4 +6,5 @@ import java.util.List;
 
 public interface ProfileChangeRequestRepository extends JpaRepository<ProfileChangeRequest, Long> {
     List<ProfileChangeRequest> findByApprovedFalseAndRejectedFalse();
+    void deleteByUser(com.example.demo.entity.User user);
 }

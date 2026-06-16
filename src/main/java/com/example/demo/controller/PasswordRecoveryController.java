@@ -50,10 +50,6 @@ public class PasswordRecoveryController {
         if (user == null) {
             // Try by username as well
             user = userRepository.findByUsername(email).orElse(null);
-            if (user == null) {
-                return ResponseEntity.badRequest().body(Map.of("error", "No user found with the provided email or username."));
-            }
-            email = user.getEmail();
         }
 
         // Generate 6-digit code
@@ -64,21 +60,26 @@ public class PasswordRecoveryController {
         System.out.println("[PASSWORD RECOVERY] Verification code for " + email + " is: " + code);
         System.out.println("=================================================");
 
-        // Send Email
-        try {
-            SimpleMailMessage mailMessage = new SimpleMailMessage();
-            mailMessage.setTo(email);
-            mailMessage.setSubject("USTC LearnX Password Recovery Verification Code");
-            mailMessage.setText("Hello,\n\n"
-                    + "You have requested to reset your password on USTC LearnX.\n"
-                    + "Your password recovery verification code is: " + code + "\n\n"
-                    + "This code will expire shortly. If you did not make this request, please ignore this email.\n\n"
-                    + "Best regards,\n"
-                    + "USTC LearnX Team");
-            mailSender.send(mailMessage);
-        } catch (Exception e) {
-            System.err.println("Failed to send verification email to " + email + ": " + e.getMessage());
-            System.out.println("[FALLBACK LOG] Code is: " + code);
+        if (user != null) {
+            email = user.getEmail();
+            recoveryCodes.put(email, code); // store under actual email if username was provided
+            
+            // Send Email
+            try {
+                SimpleMailMessage mailMessage = new SimpleMailMessage();
+                mailMessage.setTo(email);
+                mailMessage.setSubject("LearnX Password Recovery Verification Code");
+                mailMessage.setText("Hello,\n\n"
+                        + "You have requested to reset your password on LearnX.\n"
+                        + "Your password recovery verification code is: " + code + "\n\n"
+                        + "This code will expire shortly. If you did not make this request, please ignore this email.\n\n"
+                        + "Best regards,\n"
+                        + "LearnX Team");
+                mailSender.send(mailMessage);
+            } catch (Exception e) {
+                System.err.println("Failed to send verification email to " + email + ": " + e.getMessage());
+                System.out.println("[FALLBACK LOG] Code is: " + code);
+            }
         }
 
         return ResponseEntity.ok(Map.of(
@@ -98,11 +99,13 @@ public class PasswordRecoveryController {
 
         User user = userRepository.findByEmail(email).orElse(null);
         if (user == null) {
-            return ResponseEntity.badRequest().body(Map.of("error", "User not found."));
+            user = userRepository.findByUsername(email).orElse(null);
         }
-
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        userRepository.save(user);
+        
+        if (user != null) {
+            user.setPassword(passwordEncoder.encode(request.getPassword()));
+            userRepository.save(user);
+        }
 
         recoveryCodes.remove(email);
 

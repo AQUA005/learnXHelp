@@ -10,4 +10,5 @@ public interface ClassCourseAssignmentRepository extends JpaRepository<ClassCour
     List<ClassCourseAssignment> findByStudentClass(StudentClass studentClass);
     List<ClassCourseAssignment> findByTeacher(User teacher);
     void deleteByStudentClass(StudentClass studentClass);
+    void deleteByTeacher(User teacher);
 }

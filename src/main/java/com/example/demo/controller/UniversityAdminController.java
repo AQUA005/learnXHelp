@@ -32,6 +32,12 @@ public class UniversityAdminController {
     private final SystemMetadataRepository systemMetadataRepository;
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
+    private final ProfileChangeRequestRepository profileChangeRequestRepository;
+    private final ExamRepository examRepository;
+    private final ExamSubmissionRepository examSubmissionRepository;
+    private final ExamQuestionRepository examQuestionRepository;
+    private final ResourceRepository resourceRepository;
+    private final ResourceReactionRepository resourceReactionRepository;
 
     @Data
     @NoArgsConstructor
@@ -575,5 +581,41 @@ public class UniversityAdminController {
     public ResponseEntity<?> deleteMetadata(@PathVariable Long id) {
         systemMetadataRepository.deleteById(id);
         return ResponseEntity.ok(Map.of("message", "Metadata option deleted successfully"));
+    }
+
+    @DeleteMapping("/teachers/{id}")
+    @Transactional
+    public ResponseEntity<?> deleteTeacher(@PathVariable Long id, Principal principal) {
+        Optional<User> teacherOpt = userRepository.findById(id);
+        if (teacherOpt.isEmpty() || !teacherOpt.get().getRole().equals(Role.TEACHER)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Teacher not found"));
+        }
+        User teacher = teacherOpt.get();
+
+        // 1. Delete associated profile change requests
+        profileChangeRequestRepository.deleteByUser(teacher);
+
+        // 2. Delete ClassCourseAssignments
+        classCourseAssignmentRepository.deleteByTeacher(teacher);
+
+        // 3. Delete ExamSubmissions and ExamQuestions for exams created by this teacher, then the exams
+        List<Exam> exams = examRepository.findByTeacher(teacher);
+        for (Exam exam : exams) {
+            examSubmissionRepository.deleteByExam(exam);
+            examQuestionRepository.deleteByExam(exam);
+        }
+        examRepository.deleteAll(exams);
+
+        // 4. Delete Resources uploaded by this teacher
+        List<Resource> resources = resourceRepository.findByUploadedBy(teacher);
+        for (Resource res : resources) {
+            resourceReactionRepository.deleteByResourceId(res.getId());
+        }
+        resourceRepository.deleteAll(resources);
+
+        // 5. Delete the User record
+        userRepository.delete(teacher);
+
+        return ResponseEntity.ok(Map.of("message", "Teacher deleted successfully"));
     }
 }
