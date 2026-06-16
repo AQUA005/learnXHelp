@@ -23,6 +23,7 @@ public class PasswordRecoveryController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JavaMailSender mailSender;
+    private final org.springframework.core.env.Environment env;
 
     // In-memory store for verification codes (Email -> Code)
     private static final ConcurrentHashMap<String, String> recoveryCodes = new ConcurrentHashMap<>();
@@ -67,6 +68,10 @@ public class PasswordRecoveryController {
             // Send Email
             try {
                 SimpleMailMessage mailMessage = new SimpleMailMessage();
+                String fromEmail = env.getProperty("spring.mail.username");
+                if (fromEmail != null && !fromEmail.isEmpty()) {
+                    mailMessage.setFrom(fromEmail);
+                }
                 mailMessage.setTo(email);
                 mailMessage.setSubject("LearnX Password Recovery Verification Code");
                 mailMessage.setText("Hello,\n\n"

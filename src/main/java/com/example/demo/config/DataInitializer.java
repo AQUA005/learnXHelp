@@ -118,6 +118,81 @@ public class DataInitializer implements CommandLineRunner {
                 systemMetadataRepository.save(SystemMetadata.builder().type("SECTION").value(val).university(defaultUni).build());
             }
         }
+        
+        // 4. Seed Test Users (Teacher, Student, CR)
+        if (defaultUni != null) {
+            if (userRepository.findByUsername("teacher").isEmpty()) {
+                System.out.println("Seeding test teacher account...");
+                User testTeacher = User.builder()
+                        .username("teacher")
+                        .password(passwordEncoder.encode("password"))
+                        .fullName("Test Teacher")
+                        .email("teacher@learnx.help")
+                        .role(Role.TEACHER)
+                        .approved(true)
+                        .designation("Lecturer")
+                        .department("Computer Science & Engineering")
+                        .university(defaultUni)
+                        .build();
+                userRepository.save(testTeacher);
+            }
+
+            if (userRepository.findByUsername("student").isEmpty()) {
+                System.out.println("Seeding test student account...");
+                User testStudent = User.builder()
+                        .username("student")
+                        .password(passwordEncoder.encode("password"))
+                        .fullName("Test Student")
+                        .email("student@learnx.help")
+                        .role(Role.STUDENT)
+                        .approved(true)
+                        .semester("1st Semester")
+                        .batch("Batch 21")
+                        .section("Section A")
+                        .department("Computer Science & Engineering")
+                        .university(defaultUni)
+                        .build();
+                
+                final University finalUni = defaultUni;
+                StudentClass sc = studentClassRepository.findByBatchAndDepartmentAndSection("Batch 21", "Computer Science & Engineering", "Section A")
+                        .orElseGet(() -> studentClassRepository.save(StudentClass.builder()
+                                .batch("Batch 21")
+                                .department("Computer Science & Engineering")
+                                .section("Section A")
+                                .university(finalUni)
+                                .build()));
+                testStudent.setStudentClass(sc);
+                userRepository.save(testStudent);
+            }
+
+            if (userRepository.findByUsername("cr").isEmpty()) {
+                System.out.println("Seeding test CR account...");
+                User testCR = User.builder()
+                        .username("cr")
+                        .password(passwordEncoder.encode("password"))
+                        .fullName("Test CR")
+                        .email("cr@learnx.help")
+                        .role(Role.CR)
+                        .approved(true)
+                        .semester("1st Semester")
+                        .batch("Batch 21")
+                        .section("Section A")
+                        .department("Computer Science & Engineering")
+                        .university(defaultUni)
+                        .build();
+                
+                final University finalUni = defaultUni;
+                StudentClass sc = studentClassRepository.findByBatchAndDepartmentAndSection("Batch 21", "Computer Science & Engineering", "Section A")
+                        .orElseGet(() -> studentClassRepository.save(StudentClass.builder()
+                                .batch("Batch 21")
+                                .department("Computer Science & Engineering")
+                                .section("Section A")
+                                .university(finalUni)
+                                .build()));
+                testCR.setStudentClass(sc);
+                userRepository.save(testCR);
+            }
+        }
 
         System.out.println("Data seeding completed. Ready for production.");
     }

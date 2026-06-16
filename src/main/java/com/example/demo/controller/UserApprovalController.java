@@ -30,6 +30,7 @@ public class UserApprovalController {
     private final ProfileChangeRequestRepository profileChangeRequestRepository;
     private final PasswordEncoder passwordEncoder;
     private final org.springframework.mail.javamail.JavaMailSender mailSender;
+    private final org.springframework.core.env.Environment env;
 
     @GetMapping("/pending")
     public ResponseEntity<?> getPendingUsers(Principal principal) {
@@ -141,6 +142,10 @@ public class UserApprovalController {
 
         try {
             org.springframework.mail.SimpleMailMessage message = new org.springframework.mail.SimpleMailMessage();
+            String fromEmail = env.getProperty("spring.mail.username");
+            if (fromEmail != null && !fromEmail.isEmpty()) {
+                message.setFrom(fromEmail);
+            }
             message.setTo(targetUser.getEmail());
             message.setSubject("LearnX Account Approved");
             message.setText("Hello " + targetUser.getFullName() + ",\n\n"
@@ -194,6 +199,10 @@ public class UserApprovalController {
 
         try {
             org.springframework.mail.SimpleMailMessage message = new org.springframework.mail.SimpleMailMessage();
+            String fromEmail = env.getProperty("spring.mail.username");
+            if (fromEmail != null && !fromEmail.isEmpty()) {
+                message.setFrom(fromEmail);
+            }
             message.setTo(targetUser.getEmail());
             message.setSubject("LearnX Account Request Rejected");
             message.setText("Hello " + targetUser.getFullName() + ",\n\n"
@@ -319,6 +328,10 @@ public class UserApprovalController {
 
         try {
             org.springframework.mail.SimpleMailMessage message = new org.springframework.mail.SimpleMailMessage();
+            String fromEmail = env.getProperty("spring.mail.username");
+            if (fromEmail != null && !fromEmail.isEmpty()) {
+                message.setFrom(fromEmail);
+            }
             message.setTo(targetUser.getEmail());
             message.setSubject("LearnX Profile Changes Approved");
             message.setText("Hello " + targetUser.getFullName() + ",\n\n"
@@ -353,6 +366,10 @@ public class UserApprovalController {
 
         try {
             org.springframework.mail.SimpleMailMessage message = new org.springframework.mail.SimpleMailMessage();
+            String fromEmail = env.getProperty("spring.mail.username");
+            if (fromEmail != null && !fromEmail.isEmpty()) {
+                message.setFrom(fromEmail);
+            }
             message.setTo(req.getUser().getEmail());
             message.setSubject("LearnX Profile Changes Rejected");
             message.setText("Hello " + req.getUser().getFullName() + ",\n\n"

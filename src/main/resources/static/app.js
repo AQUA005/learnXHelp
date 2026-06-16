@@ -384,9 +384,11 @@ function setupSidebar() {
         addNavItem('Logs', 'audit-history', 'fa-clock-rotate-left');
         addNavItem('Schedule', 'routine-mgr', 'fa-calendar-days');
         addNavItem('Announcements', 'announcements', 'fa-bullhorn');
+        addNavItem('Send Email', 'send-email', 'fa-paper-plane');
         addNavItem('Profile', 'profile', 'fa-user-gear');
     } else if (state.user.role === 'SYSTEM_ADMIN') {
         addNavItem('Master Panel', 'master-admin-panel', 'fa-server');
+        addNavItem('Send Email', 'send-email', 'fa-paper-plane');
         addNavItem('Profile', 'profile', 'fa-user-gear');
     }
 }
@@ -477,6 +479,9 @@ function switchView(viewName) {
             break;
         case 'routine-builder':
             renderRoutineBuilder(host);
+            break;
+        case 'send-email':
+            renderSendEmailPanel(host);
             break;
     }
 }
@@ -5800,6 +5805,7 @@ async function renderProfileVerification(host) {
 
     async function loadPendingRegistrations() {
         const content = document.getElementById('verify-panel-content');
+        if (!content) return;
         content.innerHTML = `
             <h3>Pending Registration Requests</h3>
             <div class="routine-table-container" style="margin-top: 1rem;">
@@ -5895,6 +5901,7 @@ async function renderProfileVerification(host) {
 
     async function loadPendingProfileUpdates() {
         const content = document.getElementById('verify-panel-content');
+        if (!content) return;
         content.innerHTML = `
             <h3>Pending Profile Change Requests</h3>
             <div class="routine-table-container" style="margin-top: 1rem;">
@@ -6281,3 +6288,107 @@ async function renderRoutineBuilder(host) {
         }
     });
 }
+
+async function renderSendEmailPanel(host) {
+    host.innerHTML = `
+        <div style="padding: 1.5rem; max-width: 800px; margin: 0 auto; width: 100%;">
+            <div style="margin-bottom: 1.5rem;">
+                <h1 style="font-family:'Space Grotesk',sans-serif; font-size:1.8rem; margin:0 0 0.5rem 0; color:var(--accent-blue);">Send Email</h1>
+                <p style="color:var(--text-secondary); margin:0; font-size:0.95rem;">Compose and send direct emails via the system's SMTP mail service.</p>
+            </div>
+            
+            <div class="glass-panel section-card" style="background: rgba(255, 255, 255, 0.45); padding: 2rem; border-radius: 24px; border: 1px solid var(--glass-border); box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.08);">
+                <form id="form-send-email" style="display:flex; flex-direction:column; gap:1.2rem;">
+                    
+                    <div class="form-group">
+                        <label for="email-to-select" style="font-weight:600; font-size:0.85rem; display:block; margin-bottom:0.4rem;">Select Recipient (or type below)</label>
+                        <select id="email-to-select" class="form-input" style="border-radius:12px; padding:0.65rem 1rem;">
+                            <option value="">-- Custom Email / Select a member --</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email-to" style="font-weight:600; font-size:0.85rem; display:block; margin-bottom:0.4rem;">Recipient Email Address *</label>
+                        <input type="email" id="email-to" class="form-input" required placeholder="e.g. recipient@domain.com" style="border-radius:12px; padding:0.65rem 1rem;">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="email-subject" style="font-weight:600; font-size:0.85rem; display:block; margin-bottom:0.4rem;">Subject *</label>
+                        <input type="text" id="email-subject" class="form-input" required placeholder="Enter email subject" style="border-radius:12px; padding:0.65rem 1rem;">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="email-body" style="font-weight:600; font-size:0.85rem; display:block; margin-bottom:0.4rem;">Message Body *</label>
+                        <textarea id="email-body" class="form-input" required rows="8" placeholder="Type your message here..." style="resize:vertical; border-radius:12px; padding:0.65rem 1rem;"></textarea>
+                    </div>
+
+                    <button type="submit" class="btn" style="margin-top:0.5rem; background: linear-gradient(135deg, #0071e3 0%, #005bb5 100%); color:#fff; border:none; border-radius:30px; padding:0.75rem; font-weight:600; cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; gap:0.5rem; transition:transform 0.2s, box-shadow 0.2s;">
+                        <i class="fa-solid fa-paper-plane"></i> Send Email
+                    </button>
+                </form>
+            </div>
+        </div>
+    `;
+
+    const selectEl = document.getElementById('email-to-select');
+    const toInput = document.getElementById('email-to');
+    const form = document.getElementById('form-send-email');
+
+    // Populate dropdown with users
+    try {
+        const res = await apiFetch('/api/mail/users');
+        if (res && res.ok) {
+            const users = await res.json();
+            users.forEach(user => {
+                const opt = document.createElement('option');
+                opt.value = user.email;
+                opt.textContent = `${user.fullName} (${user.email}) - ${user.role}`;
+                selectEl.appendChild(opt);
+            });
+        }
+    } catch (e) {
+        console.error("Failed to load users list", e);
+    }
+
+    selectEl.addEventListener('change', () => {
+        if (selectEl.value) {
+            toInput.value = selectEl.value;
+        }
+    });
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const to = toInput.value;
+        const subject = document.getElementById('email-subject').value;
+        const body = document.getElementById('email-body').value;
+
+        if (!to || !to.includes('@')) {
+            showToast("Please enter a valid recipient email address.", "error");
+            return;
+        }
+
+        try {
+            showToast("Sending email...");
+            const resSend = await apiFetch('/api/mail/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ to, subject, body })
+            });
+
+            if (resSend && resSend.ok) {
+                showToast("Email sent successfully!");
+                form.reset();
+            } else {
+                let errText = "Failed to send email.";
+                try {
+                    const err = await resSend.json();
+                    errText = err.error || errText;
+                } catch(jErr) {}
+                showToast(errText, "error");
+            }
+        } catch (err) {
+            showToast("Network connection error", "error");
+        }
+    });
+}
+

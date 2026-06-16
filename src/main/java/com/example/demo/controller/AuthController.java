@@ -36,6 +36,7 @@ public class AuthController {
     private final SystemAdminRepository systemAdminRepository;
     private final UniversityRepository universityRepository;
     private final org.springframework.mail.javamail.JavaMailSender mailSender;
+    private final org.springframework.core.env.Environment env;
 
     @Data
     @NoArgsConstructor
@@ -208,6 +209,10 @@ public class AuthController {
 
         try {
             org.springframework.mail.SimpleMailMessage message = new org.springframework.mail.SimpleMailMessage();
+            String fromEmail = env.getProperty("spring.mail.username");
+            if (fromEmail != null && !fromEmail.isEmpty()) {
+                message.setFrom(fromEmail);
+            }
             message.setTo(user.getEmail());
             message.setSubject("LearnX Registration Under Review");
             message.setText("Hello " + user.getFullName() + ",\n\n"

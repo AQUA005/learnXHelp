@@ -41,6 +41,7 @@ public class MasterAdminController {
     private final SystemAdminRepository systemAdminRepository;
     private final BugReportRepository bugReportRepository;
     private final org.springframework.mail.javamail.JavaMailSender mailSender;
+    private final org.springframework.core.env.Environment env;
 
     @Data
     @NoArgsConstructor
@@ -405,6 +406,10 @@ public class MasterAdminController {
         for (String email : finalRecipients) {
             try {
                 org.springframework.mail.SimpleMailMessage message = new org.springframework.mail.SimpleMailMessage();
+                String fromEmail = env.getProperty("spring.mail.username");
+                if (fromEmail != null && !fromEmail.isEmpty()) {
+                    message.setFrom(fromEmail);
+                }
                 message.setTo(email);
                 message.setSubject(subject);
                 message.setText(content + "\n\n---\nSent via LearnX Master Broadcast System.");
