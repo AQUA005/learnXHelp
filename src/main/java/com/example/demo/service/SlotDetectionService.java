@@ -30,15 +30,18 @@ public class SlotDetectionService {
         private LocalTime end;
     }
 
-    public List<TimeInterval> detectFreeSlots(LocalDate date, int durationMinutes) {
+    public List<TimeInterval> detectFreeSlots(LocalDate date, int durationMinutes, com.example.demo.entity.StudentClass studentClass) {
+        if (studentClass == null) {
+            return new java.util.ArrayList<>();
+        }
         // 1. Get Day of Week
         String dayOfWeekStr = date.getDayOfWeek().name(); // e.g. "MONDAY"
 
-        // 2. Fetch routines for this day of week
-        List<ScheduleItem> routines = scheduleItemRepository.findByDayOfWeekOrderByStartTimeAsc(dayOfWeekStr);
+        // 2. Fetch routines for this day of week and student class
+        List<ScheduleItem> routines = scheduleItemRepository.findByStudentClassAndDayOfWeekOrderByStartTimeAsc(studentClass, dayOfWeekStr);
 
-        // 3. Fetch exams scheduled on this date
-        List<ClassTest> tests = classTestRepository.findAll();
+        // 3. Fetch exams scheduled on this date for this student class
+        List<ClassTest> tests = classTestRepository.findByStudentClassOrderByDateTimeAsc(studentClass);
         List<ClassTest> testsOnDate = tests.stream()
                 .filter(t -> t.getDateTime().toLocalDate().isEqual(date))
                 .toList();

@@ -362,6 +362,7 @@ function setupSidebar() {
     } else if (state.user.role === 'CR') {
         addNavItem('Home', 'dashboard', 'fa-house');
         addNavItem('Schedule', 'routine-mgr', 'fa-calendar-days');
+        addNavItem('Slot Detector', 'slot-detector', 'fa-wand-magic-sparkles');
         addNavItem('Announcements', 'announcements', 'fa-bullhorn');
         addNavItem('Management', 'admin-approvals', 'fa-user-check');
         addNavItem('Library', 'notes', 'fa-book');
@@ -371,6 +372,7 @@ function setupSidebar() {
     } else if (state.user.role === 'TEACHER') {
         addNavItem('Home', 'dashboard', 'fa-house');
         addNavItem('Schedule', 'routine-mgr', 'fa-calendar-days');
+        addNavItem('Slot Detector', 'slot-detector', 'fa-wand-magic-sparkles');
         addNavItem('Announcements', 'announcements', 'fa-bullhorn');
         addNavItem('Exams', 'exam-creator', 'fa-square-poll-horizontal');
         addNavItem('Grades', 'grades-mgr', 'fa-pen-ruler');
@@ -383,6 +385,7 @@ function setupSidebar() {
         addNavItem('Routine Builder', 'routine-builder', 'fa-calendar-plus');
         addNavItem('Logs', 'audit-history', 'fa-clock-rotate-left');
         addNavItem('Schedule', 'routine-mgr', 'fa-calendar-days');
+        addNavItem('Slot Detector', 'slot-detector', 'fa-wand-magic-sparkles');
         addNavItem('Announcements', 'announcements', 'fa-bullhorn');
         addNavItem('Send Email', 'send-email', 'fa-paper-plane');
         addNavItem('Profile', 'profile', 'fa-user-gear');
@@ -2202,7 +2205,7 @@ async function submitExamAnswers(examId, autoSubmit = false) {
 let editingRoutineId = null;
 
 function renderRoutineManager(container) {
-    if (state.user.role === 'STUDENT') {
+    if (state.user.role === 'STUDENT' || state.user.role === 'TEACHER' || state.user.role === 'ADMIN') {
         renderStudentSchedule(container);
         return;
     }
@@ -2672,7 +2675,38 @@ async function renderAuditHistory(container) {
 }
 
 // --- VIEW: SLOT DETECTOR (TEACHER) ---
-function renderSlotDetector(container) {
+async function renderSlotDetector(container) {
+    let classDropdownHtml = '';
+    let classes = [];
+
+    if (state.user.role === 'TEACHER' || state.user.role === 'ADMIN') {
+        try {
+            const classesRes = await apiFetch('/api/admin/classes');
+            if (classesRes && classesRes.ok) {
+                classes = await classesRes.json();
+            }
+        } catch (e) {
+            console.error("Failed to fetch classes", e);
+        }
+        
+        if (classes.length > 0) {
+            classDropdownHtml = `
+                <div class="form-group">
+                    <label for="slot-class-select">Select Class Group</label>
+                    <select id="slot-class-select" required style="width: 100%; padding: 0.6rem 1rem; border-radius: 20px; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--glass-border);">
+                        ${classes.map(c => {
+                            const deptCode = (c.department && c.department.includes(" - ")) ? c.department.split(" - ")[0] : (c.department || "");
+                            const className = `${deptCode} ${c.batch || ""} ${c.section || ""}`;
+                            return `<option value="${c.id}">${className}</option>`;
+                        }).join('')}
+                    </select>
+                </div>
+            `;
+        } else {
+            classDropdownHtml = `<div style="color: var(--danger); margin-bottom: 1rem;">No class groups found.</div>`;
+        }
+    }
+
     container.innerHTML = `
         <div class="view-header">
             <div class="view-title">
@@ -2685,6 +2719,7 @@ function renderSlotDetector(container) {
             <div class="glass-panel section-card" style="height: fit-content;">
                 <h3>Search Parameters</h3>
                 <form id="form-scan-slots">
+                    ${classDropdownHtml}
                     <div class="form-group">
                         <label for="slot-date">Target Date</label>
                         <input type="date" id="slot-date" class="form-input" required min="${new Date().toISOString().split('T')[0]}">
@@ -2757,8 +2792,14 @@ async function scanFreeSlots(e) {
     e.preventDefault();
     const date = document.getElementById('slot-date').value;
     const duration = document.getElementById('slot-duration').value;
+    const classSelect = document.getElementById('slot-class-select');
 
-    const res = await apiFetch(`/api/slots/detect?date=${date}&duration=${duration}`);
+    let url = `/api/slots/detect?date=${date}&duration=${duration}`;
+    if (classSelect && classSelect.value) {
+        url += `&classId=${classSelect.value}`;
+    }
+
+    const res = await apiFetch(url);
     if (!res || !res.ok) return;
 
     const slots = await res.json();
@@ -2801,11 +2842,17 @@ async function confirmModalCtSchedule(e) {
     const durationMinutes = document.getElementById('modal-duration').value;
     const roomNo = document.getElementById('modal-room').value;
     const topic = document.getElementById('modal-topic').value;
+    const classSelect = document.getElementById('slot-class-select');
+
+    const body = { courseName, dateTime, durationMinutes: parseInt(durationMinutes), roomNo, topic };
+    if (classSelect && classSelect.value) {
+        body.studentClass = { id: parseInt(classSelect.value) };
+    }
 
     const res = await apiFetch('/api/schedule/ct', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ courseName, dateTime, durationMinutes: parseInt(durationMinutes), roomNo, topic })
+        body: JSON.stringify(body)
     });
 
     if (res && res.ok) {
@@ -3729,6 +3776,41 @@ async function loadAnnouncementsFeed() {
 // --- VIEW: TRIPLE-MODE SCHEDULE CALENDAR (STUDENT) ---
 // --- VIEW: TRIPLE-MODE SCHEDULE CALENDAR (STUDENT) ---
 async function renderStudentSchedule(container) {
+    let classDropdownHtml = '';
+    let selectedClassId = '';
+    let classes = [];
+
+    if (state.user.role === 'TEACHER' || state.user.role === 'ADMIN') {
+        try {
+            const classesRes = await apiFetch('/api/admin/classes');
+            if (classesRes && classesRes.ok) {
+                classes = await classesRes.json();
+                if (classes.length > 0) {
+                    selectedClassId = classes[0].id;
+                }
+            }
+        } catch (e) {
+            console.error("Failed to fetch classes", e);
+        }
+        
+        if (classes.length > 0) {
+            classDropdownHtml = `
+                <div class="form-group" style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                    <label for="sched-class-select" style="font-weight: 600; font-size: 0.95rem; margin-bottom: 0; color: var(--text-primary);">Select Class Group:</label>
+                    <select id="sched-class-select" style="width: auto; min-width: 200px; padding: 0.4rem 1rem; border-radius: 20px; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--glass-border);">
+                        ${classes.map(c => {
+                            const deptCode = (c.department && c.department.includes(" - ")) ? c.department.split(" - ")[0] : (c.department || "");
+                            const className = `${deptCode} ${c.batch || ""} ${c.section || ""}`;
+                            return `<option value="${c.id}">${className}</option>`;
+                        }).join('')}
+                    </select>
+                </div>
+            `;
+        } else {
+            classDropdownHtml = `<div style="color: var(--danger); margin-bottom: 1rem;">No class groups found.</div>`;
+        }
+    }
+
     container.innerHTML = `
         <div class="view-header">
             <div class="view-title">
@@ -3736,6 +3818,7 @@ async function renderStudentSchedule(container) {
             </div>
         </div>
         <div class="glass-panel section-card">
+            ${classDropdownHtml}
             <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 1rem;">
                 <button class="btn sched-tab active" data-tab="today" style="width: auto;">Today's Timeline</button>
                 <button class="btn btn-secondary sched-tab" data-tab="weekly" style="width: auto;">Weekly Grid</button>
@@ -3774,17 +3857,41 @@ async function renderStudentSchedule(container) {
         firstTab.style.color = '#fff';
     }
 
-    // Load data
-    const [routineRes, ctRes] = await Promise.all([
-        apiFetch('/api/schedule/routine'),
-        apiFetch('/api/schedule/ct')
-    ]);
+    async function loadScheduleData(classId) {
+        const hostEl = document.getElementById('schedule-content-host');
+        if (hostEl) {
+            hostEl.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 2rem;"><i class="fa-solid fa-spinner fa-spin"></i> Loading schedule data...</div>`;
+        }
 
-    if (routineRes && routineRes.ok && ctRes && ctRes.ok) {
-        state.routineData = await routineRes.json();
-        state.ctData = await ctRes.json();
-        renderScheduleTab('today');
+        let routineUrl = '/api/schedule/routine';
+        let ctUrl = '/api/schedule/ct';
+        if (classId) {
+            routineUrl += `?classId=${classId}`;
+            ctUrl += `?classId=${classId}`;
+        }
+
+        const [routineRes, ctRes] = await Promise.all([
+            apiFetch(routineUrl),
+            apiFetch(ctUrl)
+        ]);
+
+        if (routineRes && routineRes.ok && ctRes && ctRes.ok) {
+            state.routineData = await routineRes.json();
+            state.ctData = await ctRes.json();
+            const activeTab = container.querySelector('.sched-tab.active');
+            const tabName = activeTab ? activeTab.getAttribute('data-tab') : 'today';
+            renderScheduleTab(tabName);
+        }
     }
+
+    const selectEl = container.querySelector('#sched-class-select');
+    if (selectEl) {
+        selectEl.addEventListener('change', async (e) => {
+            await loadScheduleData(e.target.value);
+        });
+    }
+
+    await loadScheduleData(selectedClassId);
 }
 
 function renderScheduleTab(tabName) {

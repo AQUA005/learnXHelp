@@ -205,12 +205,24 @@ public class ScheduleController {
     // --- Class Test (CT) endpoints ---
 
     @GetMapping("/ct")
-    public ResponseEntity<List<ClassTest>> getUpcomingCTs(Principal principal) {
+    public ResponseEntity<List<ClassTest>> getUpcomingCTs(
+            @RequestParam(required = false) Long classId,
+            Principal principal) {
         if (principal != null) {
             com.example.demo.entity.User user = userRepository.findByUsername(principal.getName()).orElse(null);
-            if (user != null && (user.getRole() == com.example.demo.entity.User.Role.STUDENT || user.getRole() == com.example.demo.entity.User.Role.CR)) {
-                if (user.getStudentClass() != null) {
-                    return ResponseEntity.ok(classTestRepository.findByStudentClassOrderByDateTimeAsc(user.getStudentClass()));
+            if (user != null) {
+                if (classId != null) {
+                    com.example.demo.entity.StudentClass sc = studentClassRepository.findById(classId).orElse(null);
+                    if (sc != null) {
+                        return ResponseEntity.ok(classTestRepository.findByStudentClassOrderByDateTimeAsc(sc));
+                    }
+                }
+                
+                if (user.getRole() == com.example.demo.entity.User.Role.STUDENT || user.getRole() == com.example.demo.entity.User.Role.CR) {
+                    if (user.getStudentClass() != null) {
+                        return ResponseEntity.ok(classTestRepository.findByStudentClassOrderByDateTimeAsc(user.getStudentClass()));
+                    }
+                    return ResponseEntity.ok(List.of());
                 }
             }
         }
@@ -219,6 +231,23 @@ public class ScheduleController {
 
     @PostMapping("/ct")
     public ResponseEntity<?> addClassTest(@RequestBody ClassTest ct, Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        }
+        com.example.demo.entity.User user = userRepository.findByUsername(principal.getName()).orElse(null);
+        if (user == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "User not found"));
+        }
+
+        if (ct.getStudentClass() == null) {
+            if (user.getRole() == com.example.demo.entity.User.Role.CR || user.getRole() == com.example.demo.entity.User.Role.STUDENT) {
+                ct.setStudentClass(user.getStudentClass());
+            }
+        }
+        if (ct.getUniversity() == null) {
+            ct.setUniversity(user.getUniversity());
+        }
+
         ct.setCreatedBy(principal.getName());
         ClassTest saved = classTestRepository.save(ct);
 

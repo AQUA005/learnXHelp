@@ -29,4 +29,10 @@ public class StudentClass {
     @OneToMany(mappedBy = "studentClass")
     @JsonIgnore
     private List<User> students;
+
+    @com.fasterxml.jackson.annotation.JsonProperty("className")
+    public String getClassName() {
+        String deptCode = (department != null && department.contains(" - ")) ? department.split(" - ")[0] : (department != null ? department : "");
+        return deptCode + " " + (batch != null ? batch : "") + " " + (section != null ? section : "");
+    }
 }
