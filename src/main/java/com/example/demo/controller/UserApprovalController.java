@@ -154,11 +154,14 @@ public class UserApprovalController {
                     + "Best regards,\n"
                     + "LearnX Team");
             mailSender.send(message);
+            return ResponseEntity.ok(Map.of("message", "User account approved successfully"));
         } catch (Exception ex) {
             System.err.println("Failed to send approval email to " + targetUser.getEmail() + ": " + ex.getMessage());
+            return ResponseEntity.ok(Map.of(
+                    "message", "User account approved successfully",
+                    "warning", "Account approved, but notification email failed to send: " + ex.getMessage()
+            ));
         }
-
-        return ResponseEntity.ok(Map.of("message", "User account approved successfully"));
     }
 
     @DeleteMapping("/reject/{id}")
@@ -197,6 +200,7 @@ public class UserApprovalController {
                     .body(Map.of("error", "You do not have permission to reject a user with role: " + targetRole));
         }
 
+        userRepository.delete(targetUser);
         try {
             org.springframework.mail.SimpleMailMessage message = new org.springframework.mail.SimpleMailMessage();
             String fromEmail = env.getProperty("spring.mail.username");
@@ -211,12 +215,14 @@ public class UserApprovalController {
                     + "Best regards,\n"
                     + "LearnX Team");
             mailSender.send(message);
+            return ResponseEntity.ok(Map.of("message", "User account request rejected and deleted"));
         } catch (Exception ex) {
             System.err.println("Failed to send rejection email to " + targetUser.getEmail() + ": " + ex.getMessage());
+            return ResponseEntity.ok(Map.of(
+                    "message", "User account request rejected and deleted",
+                    "warning", "Account rejected, but notification email failed to send: " + ex.getMessage()
+            ));
         }
-
-        userRepository.delete(targetUser);
-        return ResponseEntity.ok(Map.of("message", "User account request rejected and deleted"));
     }
 
     // -------------------------------------------------------------
@@ -339,11 +345,14 @@ public class UserApprovalController {
                     + "Best regards,\n"
                     + "LearnX Team");
             mailSender.send(message);
+            return ResponseEntity.ok(Map.of("message", "Profile change request approved and applied successfully"));
         } catch (Exception ex) {
             System.err.println("Failed to send profile approval email to " + targetUser.getEmail() + ": " + ex.getMessage());
+            return ResponseEntity.ok(Map.of(
+                    "message", "Profile change request approved and applied successfully",
+                    "warning", "Changes approved, but notification email failed to send: " + ex.getMessage()
+            ));
         }
-
-        return ResponseEntity.ok(Map.of("message", "Profile change request approved and applied successfully"));
     }
 
     @PostMapping("/profile-requests/{id}/reject")
@@ -377,10 +386,13 @@ public class UserApprovalController {
                     + "Best regards,\n"
                     + "LearnX Team");
             mailSender.send(message);
+            return ResponseEntity.ok(Map.of("message", "Profile change request rejected"));
         } catch (Exception ex) {
             System.err.println("Failed to send profile rejection email to " + req.getUser().getEmail() + ": " + ex.getMessage());
+            return ResponseEntity.ok(Map.of(
+                    "message", "Profile change request rejected",
+                    "warning", "Changes rejected, but notification email failed to send: " + ex.getMessage()
+            ));
         }
-
-        return ResponseEntity.ok(Map.of("message", "Profile change request rejected"));
     }
 }

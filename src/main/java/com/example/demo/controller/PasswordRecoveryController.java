@@ -84,6 +84,7 @@ public class PasswordRecoveryController {
             } catch (Exception e) {
                 System.err.println("Failed to send verification email to " + email + ": " + e.getMessage());
                 System.out.println("[FALLBACK LOG] Code is: " + code);
+                return ResponseEntity.status(500).body(Map.of("error", "Failed to send verification email: " + e.getMessage()));
             }
         }
 

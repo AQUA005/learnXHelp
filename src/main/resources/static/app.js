@@ -3410,7 +3410,12 @@ async function loadMgmtPendingRequests() {
             const id = e.currentTarget.getAttribute('data-id');
             const response = await apiFetch(`/api/approvals/approve/${id}`, { method: 'POST' });
             if (response && response.ok) {
-                showToast("Account approved successfully!");
+                const data = await response.json();
+                if (data.warning) {
+                    showToast(data.warning, "warning");
+                } else {
+                    showToast("Account approved successfully!");
+                }
                 loadMgmtPendingRequests();
             } else if (response) {
                 const err = await response.json();
@@ -3423,7 +3428,12 @@ async function loadMgmtPendingRequests() {
                 const id = e.currentTarget.getAttribute('data-id');
                 const response = await apiFetch(`/api/approvals/reject/${id}`, { method: 'DELETE' });
                 if (response && response.ok) {
-                    showToast("Registration request rejected", "warning");
+                    const data = await response.json();
+                    if (data.warning) {
+                        showToast(data.warning, "warning");
+                    } else {
+                        showToast("Registration request rejected", "warning");
+                    }
                     loadMgmtPendingRequests();
                 } else if (response) {
                     const err = await response.json();
@@ -3568,7 +3578,12 @@ async function loadMgmtProfileRequests() {
             const id = e.currentTarget.getAttribute('data-id');
             const response = await apiFetch(`/api/approvals/profile-requests/${id}/approve`, { method: 'POST' });
             if (response && response.ok) {
-                showToast("Profile change request verified and applied!");
+                const data = await response.json();
+                if (data.warning) {
+                    showToast(data.warning, "warning");
+                } else {
+                    showToast("Profile change request verified and applied!");
+                }
                 loadMgmtProfileRequests();
             } else if (response) {
                 const err = await response.json();
@@ -3581,7 +3596,12 @@ async function loadMgmtProfileRequests() {
                 const id = e.currentTarget.getAttribute('data-id');
                 const response = await apiFetch(`/api/approvals/profile-requests/${id}/reject`, { method: 'POST' });
                 if (response && response.ok) {
-                    showToast("Profile change request rejected", "warning");
+                    const data = await response.json();
+                    if (data.warning) {
+                        showToast(data.warning, "warning");
+                    } else {
+                        showToast("Profile change request rejected", "warning");
+                    }
                     loadMgmtProfileRequests();
                 } else if (response) {
                     const err = await response.json();
@@ -4789,6 +4809,8 @@ async function loadMasterBroadcastForm() {
                         </div>
                     </div>
 
+                    <div id="broadcast-status-box" style="display:none; padding:1rem; border-radius:12px; font-size:0.9rem; font-weight:500; margin-bottom:0.5rem; flex-direction:column; gap:0.5rem;"></div>
+
                     <button type="submit" class="btn" style="margin-top:0.5rem; background:var(--accent-blue); color:#fff; border:none; border-radius:30px; padding:0.75rem; font-weight:600; cursor:pointer;">
                         <i class="fa-solid fa-paper-plane"></i> Send Email Broadcast
                     </button>
@@ -4875,6 +4897,15 @@ async function loadMasterBroadcastForm() {
                 }
             }
 
+            const statusBox = container.querySelector('#broadcast-status-box');
+            if (statusBox) {
+                statusBox.style.display = 'flex';
+                statusBox.style.background = 'rgba(0, 113, 227, 0.08)';
+                statusBox.style.border = '1px solid var(--accent-blue)';
+                statusBox.style.color = 'var(--accent-blue)';
+                statusBox.innerHTML = `<div><i class="fa-solid fa-spinner fa-spin"></i> Sending broadcast emails...</div>`;
+            }
+
             try {
                 showToast("Sending broadcast emails...");
                 const resSend = await apiFetch('/api/master/send-email', {
@@ -4886,14 +4917,61 @@ async function loadMasterBroadcastForm() {
                 if (resSend && resSend.ok) {
                     const data = await resSend.json();
                     showToast(`Broadcast complete! Sent: ${data.successCount}, Failed: ${data.failCount}`);
-                    container.querySelector('#form-broadcast-email').reset();
-                    containerSel.style.display = 'none';
+                    
+                    if (statusBox) {
+                        if (data.failCount === 0) {
+                            statusBox.style.background = 'rgba(48, 209, 88, 0.08)';
+                            statusBox.style.border = '1px solid #30d158';
+                            statusBox.style.color = '#30d158';
+                            statusBox.innerHTML = `<div><i class="fa-solid fa-circle-check"></i> Broadcast complete! All ${data.successCount} emails sent successfully.</div>`;
+                            container.querySelector('#form-broadcast-email').reset();
+                            containerSel.style.display = 'none';
+                            containerCustom.style.display = 'none';
+                            setTimeout(() => { statusBox.style.display = 'none'; }, 6000);
+                        } else {
+                            statusBox.style.background = 'rgba(255, 69, 58, 0.08)';
+                            statusBox.style.border = '1px solid #ff453a';
+                            statusBox.style.color = '#ff453a';
+                            let statusHtml = `
+                                <div style="font-weight: 700;">
+                                    <i class="fa-solid fa-triangle-exclamation"></i> Broadcast completed with errors!
+                                    Sent: ${data.successCount}, Failed: ${data.failCount}
+                                </div>
+                                <div style="margin-top:0.5rem; max-height:160px; overflow-y:auto; border-top:1px solid rgba(255,69,58,0.2); padding-top:0.5rem; display:flex; flex-direction:column; gap:0.25rem;">
+                            `;
+                            if (data.failedRecipients && data.failedRecipients.length > 0) {
+                                data.failedRecipients.forEach(f => {
+                                    statusHtml += `<div style="font-size:0.8rem;"><strong>${f.email}</strong>: <span style="opacity:0.9;">${f.error}</span></div>`;
+                                });
+                            } else {
+                                statusHtml += `<div style="font-size:0.8rem; font-style:italic;">Unknown delivery exceptions.</div>`;
+                            }
+                            statusHtml += `</div>`;
+                            statusBox.innerHTML = statusHtml;
+                        }
+                    }
                 } else {
-                    const err = await resSend.json();
-                    showToast(err.error || "Failed to send broadcast.", "error");
+                    let errText = "Failed to send broadcast.";
+                    try {
+                        const err = await resSend.json();
+                        errText = err.error || errText;
+                    } catch(jErr) {}
+                    showToast(errText, "error");
+                    if (statusBox) {
+                        statusBox.style.background = 'rgba(255, 69, 58, 0.08)';
+                        statusBox.style.border = '1px solid #ff453a';
+                        statusBox.style.color = '#ff453a';
+                        statusBox.innerHTML = `<div><i class="fa-solid fa-triangle-exclamation"></i> <strong>Broadcast execution failed:</strong> ${errText}</div>`;
+                    }
                 }
             } catch (err) {
                 showToast("Network connection error", "error");
+                if (statusBox) {
+                    statusBox.style.background = 'rgba(255, 69, 58, 0.08)';
+                    statusBox.style.border = '1px solid #ff453a';
+                    statusBox.style.color = '#ff453a';
+                    statusBox.innerHTML = `<div><i class="fa-solid fa-triangle-exclamation"></i> <strong>Network error:</strong> Connection timed out or failed to reach the server.</div>`;
+                }
             }
         });
 
@@ -5980,7 +6058,12 @@ async function renderProfileVerification(host) {
                 row.querySelector('.btn-approve-reg').addEventListener('click', async () => {
                     const resApprove = await apiFetch(`/api/approvals/approve/${req.id}`, { method: 'POST' });
                     if (resApprove && resApprove.ok) {
-                        showToast("Account approved successfully!");
+                        const data = await resApprove.json();
+                        if (data.warning) {
+                            showToast(data.warning, "warning");
+                        } else {
+                            showToast("Account approved successfully!");
+                        }
                         loadPendingRegistrations();
                     } else {
                         showToast("Failed to approve account", "error");
@@ -5991,7 +6074,12 @@ async function renderProfileVerification(host) {
                     if (confirm("Are you sure you want to reject and delete this registration request?")) {
                         const resReject = await apiFetch(`/api/approvals/reject/${req.id}`, { method: 'DELETE' });
                         if (resReject && resReject.ok) {
-                            showToast("Registration request rejected", "warning");
+                            const data = await resReject.json();
+                            if (data.warning) {
+                                showToast(data.warning, "warning");
+                            } else {
+                                showToast("Registration request rejected", "warning");
+                            }
                             loadPendingRegistrations();
                         } else {
                             showToast("Failed to reject registration", "error");
@@ -6075,7 +6163,12 @@ async function renderProfileVerification(host) {
                 row.querySelector('.btn-approve-update').addEventListener('click', async () => {
                     const resApprove = await apiFetch(`/api/approvals/profile-requests/${req.id}/approve`, { method: 'POST' });
                     if (resApprove && resApprove.ok) {
-                        showToast("Profile change request verified and applied!");
+                        const data = await resApprove.json();
+                        if (data.warning) {
+                            showToast(data.warning, "warning");
+                        } else {
+                            showToast("Profile change request verified and applied!");
+                        }
                         loadPendingProfileUpdates();
                     } else {
                         showToast("Failed to verify updates", "error");
@@ -6086,7 +6179,12 @@ async function renderProfileVerification(host) {
                     if (confirm("Are you sure you want to reject this profile change request?")) {
                         const resReject = await apiFetch(`/api/approvals/profile-requests/${req.id}/reject`, { method: 'POST' });
                         if (resReject && resReject.ok) {
-                            showToast("Profile change request rejected", "warning");
+                            const data = await resReject.json();
+                            if (data.warning) {
+                                showToast(data.warning, "warning");
+                            } else {
+                                showToast("Profile change request rejected", "warning");
+                            }
                             loadPendingProfileUpdates();
                         } else {
                             showToast("Failed to reject request", "error");
@@ -6429,6 +6527,8 @@ async function renderSendEmailPanel(host) {
                         <textarea id="email-body" class="form-input" required rows="8" placeholder="Type your message here..." style="resize:vertical; border-radius:12px; padding:0.65rem 1rem;"></textarea>
                     </div>
 
+                    <div id="email-status-box" style="display:none; padding:1rem; border-radius:12px; font-size:0.9rem; font-weight:500; margin-bottom:0.5rem;"></div>
+
                     <button type="submit" class="btn" style="margin-top:0.5rem; background: linear-gradient(135deg, #0071e3 0%, #005bb5 100%); color:#fff; border:none; border-radius:30px; padding:0.75rem; font-weight:600; cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; gap:0.5rem; transition:transform 0.2s, box-shadow 0.2s;">
                         <i class="fa-solid fa-paper-plane"></i> Send Email
                     </button>
@@ -6474,6 +6574,13 @@ async function renderSendEmailPanel(host) {
             return;
         }
 
+        const statusBox = document.getElementById('email-status-box');
+        statusBox.style.display = 'block';
+        statusBox.style.background = 'rgba(0, 113, 227, 0.08)';
+        statusBox.style.border = '1px solid var(--accent-blue)';
+        statusBox.style.color = 'var(--accent-blue)';
+        statusBox.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Sending email...`;
+
         try {
             showToast("Sending email...");
             const resSend = await apiFetch('/api/mail/send', {
@@ -6484,7 +6591,14 @@ async function renderSendEmailPanel(host) {
 
             if (resSend && resSend.ok) {
                 showToast("Email sent successfully!");
+                statusBox.style.background = 'rgba(48, 209, 88, 0.08)';
+                statusBox.style.border = '1px solid #30d158';
+                statusBox.style.color = '#30d158';
+                statusBox.innerHTML = `<i class="fa-solid fa-circle-check"></i> Email sent successfully!`;
                 form.reset();
+                setTimeout(() => {
+                    statusBox.style.display = 'none';
+                }, 5000);
             } else {
                 let errText = "Failed to send email.";
                 try {
@@ -6492,9 +6606,17 @@ async function renderSendEmailPanel(host) {
                     errText = err.error || errText;
                 } catch(jErr) {}
                 showToast(errText, "error");
+                statusBox.style.background = 'rgba(255, 69, 58, 0.08)';
+                statusBox.style.border = '1px solid #ff453a';
+                statusBox.style.color = '#ff453a';
+                statusBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> <strong>Unable to send email:</strong> ${errText}`;
             }
         } catch (err) {
             showToast("Network connection error", "error");
+            statusBox.style.background = 'rgba(255, 69, 58, 0.08)';
+            statusBox.style.border = '1px solid #ff453a';
+            statusBox.style.color = '#ff453a';
+            statusBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> <strong>Network connection error:</strong> Failed to reach SMTP server or application endpoint.`;
         }
     });
 }

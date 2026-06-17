@@ -402,6 +402,7 @@ public class MasterAdminController {
 
         int successCount = 0;
         int failCount = 0;
+        List<Map<String, String>> failedRecipients = new java.util.ArrayList<>();
 
         for (String email : finalRecipients) {
             try {
@@ -418,6 +419,10 @@ public class MasterAdminController {
             } catch (Exception ex) {
                 System.err.println("Failed to send broadcast email to " + email + ": " + ex.getMessage());
                 failCount++;
+                Map<String, String> failMap = new java.util.HashMap<>();
+                failMap.put("email", email);
+                failMap.put("error", ex.getMessage());
+                failedRecipients.add(failMap);
             }
         }
 
@@ -425,7 +430,8 @@ public class MasterAdminController {
                 "message", "Broadcast complete",
                 "totalSent", finalRecipients.size(),
                 "successCount", successCount,
-                "failCount", failCount
+                "failCount", failCount,
+                "failedRecipients", failedRecipients
         ));
     }
 }
