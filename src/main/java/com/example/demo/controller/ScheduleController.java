@@ -38,6 +38,10 @@ public class ScheduleController {
                 if (classId != null) {
                     com.example.demo.entity.StudentClass sc = studentClassRepository.findById(classId).orElse(null);
                     if (sc != null) {
+                        if (user.getUniversity() != null && sc.getUniversity() != null &&
+                            !sc.getUniversity().getId().equals(user.getUniversity().getId())) {
+                            return ResponseEntity.status(403).body(List.of());
+                        }
                         return ResponseEntity.ok(scheduleItemRepository.findByStudentClass(sc));
                     }
                 }
@@ -214,6 +218,10 @@ public class ScheduleController {
                 if (classId != null) {
                     com.example.demo.entity.StudentClass sc = studentClassRepository.findById(classId).orElse(null);
                     if (sc != null) {
+                        if (user.getUniversity() != null && sc.getUniversity() != null &&
+                            !sc.getUniversity().getId().equals(user.getUniversity().getId())) {
+                            return ResponseEntity.status(403).body(List.of());
+                        }
                         return ResponseEntity.ok(classTestRepository.findByStudentClassOrderByDateTimeAsc(sc));
                     }
                 }

@@ -75,6 +75,11 @@ public class SlotController {
             return ResponseEntity.ok(List.of());
         }
 
+        if (user.getUniversity() != null && targetClass.getUniversity() != null &&
+            !targetClass.getUniversity().getId().equals(user.getUniversity().getId())) {
+            return ResponseEntity.status(403).body(Map.of("error", "Forbidden: Class group belongs to another university"));
+        }
+
         List<TimeInterval> freeSlots = slotDetectionService.detectFreeSlots(date, duration, targetClass);
         return ResponseEntity.ok(freeSlots);
     }
