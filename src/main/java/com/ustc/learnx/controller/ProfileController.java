@@ -1,0 +1,101 @@
+package com.ustc.learnx.controller;
+
+import com.ustc.learnx.entity.ProfileChangeRequest;
+import com.ustc.learnx.entity.User;
+import com.ustc.learnx.repository.ProfileChangeRequestRepository;
+import com.ustc.learnx.repository.UserRepository;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.security.Principal;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/profile")
+@AllArgsConstructor
+public class ProfileController {
+
+    private final UserRepository userRepository;
+    private final ProfileChangeRequestRepository profileChangeRequestRepository;
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ProfileUpdateRequest {
+        private String fullName;
+        private String email;
+        private String idNo;
+        private String department;
+        private String batch;
+        private String semester;
+        private String section;
+        private String designation;
+        private String profilePicUrl;
+    }
+
+    @PostMapping("/update")
+    public ResponseEntity<?> updateProfile(@RequestBody ProfileUpdateRequest request, Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Not authenticated"));
+        }
+        User currentUser = userRepository.findByUsername(principal.getName()).orElse(null);
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "User not found"));
+        }
+
+        boolean nameChanged = false;
+        if (request.getFullName() != null && !request.getFullName().trim().isEmpty() && !request.getFullName().equals(currentUser.getFullName())) {
+            currentUser.setFullName(request.getFullName().trim());
+            nameChanged = true;
+        }
+
+        // Instantly update the non-sensitive profile photo if provided
+        if (request.getProfilePicUrl() != null) {
+            currentUser.setProfilePicUrl(request.getProfilePicUrl());
+        }
+
+        if (nameChanged || request.getProfilePicUrl() != null) {
+            userRepository.save(currentUser);
+        }
+
+        boolean changed = false;
+        
+        if (request.getEmail() != null && !request.getEmail().equals(currentUser.getEmail())) changed = true;
+        if (request.getIdNo() != null && !request.getIdNo().equals(currentUser.getIdNo())) changed = true;
+        if (request.getDepartment() != null && !request.getDepartment().equals(currentUser.getDepartment())) changed = true;
+        if (request.getBatch() != null && !request.getBatch().equals(currentUser.getBatch())) changed = true;
+        if (request.getSemester() != null && !request.getSemester().equals(currentUser.getSemester())) changed = true;
+        if (request.getSection() != null && !request.getSection().equals(currentUser.getSection())) changed = true;
+        if (request.getDesignation() != null && !request.getDesignation().equals(currentUser.getDesignation())) changed = true;
+
+        if (!changed) {
+            return ResponseEntity.ok(Map.of(
+                "message", "Profile updated successfully.",
+                "user", currentUser
+            ));
+        }
+
+        ProfileChangeRequest changeRequest = ProfileChangeRequest.builder()
+                .user(currentUser)
+                .newFullName(currentUser.getFullName())
+                .newEmail(request.getEmail())
+                .newIdNo(request.getIdNo())
+                .newDepartment(request.getDepartment())
+                .newBatch(request.getBatch())
+                .newSemester(request.getSemester())
+                .newSection(request.getSection())
+                .newDesignation(request.getDesignation())
+                .build();
+
+        profileChangeRequestRepository.save(changeRequest);
+
+        return ResponseEntity.ok(Map.of(
+            "message", "Sensitive changes submitted. Administrator approval is required before they take effect.",
+            "user", currentUser
+        ));
+    }
+}

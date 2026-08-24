@@ -37,3 +37,18 @@ build/
 .tmp.*/
 data/
 
+
+### Secrets — never commit ###
+.env
+*.env
+!.env.example
+application-local.properties
+application-secrets.properties
+*.pem
+*.key
+*.jks
+*.p12
+
+### Frontend (added in Phase 4) ###
+frontend/node_modules/
+frontend/dist/
