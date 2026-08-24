@@ -13,4 +13,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByEmail(String email);
     java.util.List<User> findByUniversityAndRole(University university, User.Role role);
     java.util.List<User> findByStudentClass(StudentClass studentClass);
+
+    /** Accounts awaiting administrator approval. */
+    java.util.List<User> findByApprovedFalse();
+
+    /** Accounts awaiting approval within a single university. */
+    java.util.List<User> findByApprovedFalseAndUniversity_Id(Long universityId);
+
+    java.util.List<User> findByUniversity_Id(Long universityId);
 }

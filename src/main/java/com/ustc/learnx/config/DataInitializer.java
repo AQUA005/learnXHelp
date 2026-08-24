@@ -6,6 +6,7 @@ import com.ustc.learnx.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -13,7 +14,15 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
+/**
+ * Seeds demo data and well-known test accounts.
+ *
+ * <p>Restricted to the "dev" profile: these accounts use the password
+ * "password" and must never exist in a deployed environment. Production data is
+ * bootstrapped by migrations instead.
+ */
 @Component
+@Profile("dev")
 @RequiredArgsConstructor
 public class DataInitializer implements CommandLineRunner {
 

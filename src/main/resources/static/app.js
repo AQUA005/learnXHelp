@@ -55,8 +55,31 @@ function formatDateTime(dateTimeStr) {
     });
 }
 
-// Fetch helper with auto-redirect to login on 401
+// Reads a cookie value by name, or null when it is absent.
+function readCookie(name) {
+    const prefix = name + "=";
+    for (const part of document.cookie.split(";")) {
+        const entry = part.trim();
+        if (entry.startsWith(prefix)) {
+            return decodeURIComponent(entry.substring(prefix.length));
+        }
+    }
+    return null;
+}
+
+// The server issues an XSRF-TOKEN cookie and requires it echoed back in the
+// X-XSRF-TOKEN header on every state-changing request.
+const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS', 'TRACE'];
+
+// Fetch helper: attaches the CSRF header and redirects to login on 401.
 async function apiFetch(url, options = {}) {
+    const method = (options.method || 'GET').toUpperCase();
+    if (!SAFE_METHODS.includes(method)) {
+        const token = readCookie('XSRF-TOKEN');
+        if (token) {
+            options = { ...options, headers: { ...(options.headers || {}), 'X-XSRF-TOKEN': token } };
+        }
+    }
     try {
         const response = await fetch(url, options);
         if (response.status === 401 && !url.includes('/api/auth/current-user') && !url.includes('/api/auth/login')) {
@@ -298,7 +321,7 @@ function renderAdminLoginPage() {
         const password = document.getElementById('admin-login-password').value;
 
         try {
-            const res = await fetch('/api/auth/login', {
+            const res = await apiFetch('/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
@@ -309,7 +332,7 @@ function renderAdminLoginPage() {
                 if (state.user.role !== 'SYSTEM_ADMIN') {
                     showToast("This login is for system administrators only. Please use the standard login page to sign in.", "error");
                     // Log them out
-                    await fetch('/api/auth/logout', { method: 'POST' });
+                    await apiFetch('/api/auth/logout', { method: 'POST' });
                     state.user = null;
                     return;
                 }
@@ -600,7 +623,7 @@ async function renderProfilePage(host) {
     // Fetch profile metadata first
     let departments = [], semesters = [], Batchs = [], designations = [];
     try {
-        const res = await fetch('/api/metadata');
+        const res = await apiFetch('/api/metadata');
         if (res.ok) {
             const options = await res.json();
             departments = options.filter(o => o.type === 'DEPARTMENT').map(o => o.value);
@@ -805,7 +828,7 @@ async function renderProfilePage(host) {
 // --- LOGOUT ---
 async function logout() {
     try {
-        await fetch('/api/auth/logout', { method: 'POST' });
+        await apiFetch('/api/auth/logout', { method: 'POST' });
     } catch (e) {
         console.error("Backend logout call failed", e);
     }
@@ -959,7 +982,7 @@ function showRecoveryForm() {
         const email = document.getElementById('recovery-email').value;
 
         try {
-            const res = await fetch('/api/auth/recover/request', {
+            const res = await apiFetch('/api/auth/recover/request', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email })
@@ -991,7 +1014,7 @@ function showRecoveryForm() {
         const email = state.recoveryEmail;
 
         try {
-            const res = await fetch('/api/auth/recover/reset', {
+            const res = await apiFetch('/api/auth/recover/reset', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, code, password })
@@ -3451,7 +3474,7 @@ async function loadMgmtMetadata(type) {
     tbody.innerHTML = `<tr><td colspan="2" style="text-align: center;">Loading options...</td></tr>`;
 
     try {
-        const res = await fetch('/api/metadata');
+        const res = await apiFetch('/api/metadata');
         if (res.ok) {
             const list = await res.json();
             const filtered = list.filter(item => item.type === type);

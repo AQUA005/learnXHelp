@@ -9,6 +9,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -18,8 +19,16 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * University administration: academic metadata, teachers, courses, classes,
+ * CR assignment and batch promotion.
+ *
+ * <p>Restricted to ADMIN. Every operation is scoped to the caller's own
+ * university, resolved from their account rather than from a request header.
+ */
 @RestController
 @RequestMapping("/api/admin")
+@PreAuthorize("hasRole('ADMIN')")
 @AllArgsConstructor
 public class UniversityAdminController {
 
@@ -38,6 +47,7 @@ public class UniversityAdminController {
     private final ExamQuestionRepository examQuestionRepository;
     private final ResourceRepository resourceRepository;
     private final ResourceReactionRepository resourceReactionRepository;
+    private final com.ustc.learnx.service.CurrentUserService currentUserService;
 
     @Data
     @NoArgsConstructor
@@ -101,18 +111,15 @@ public class UniversityAdminController {
         private String teacherName;
     }
 
-    private University getUniversityContext(String domainHeader, Principal principal) {
-        if (domainHeader != null && !domainHeader.trim().isEmpty()) {
-            return universityRepository.findByDomain(domainHeader).orElse(null);
-        }
-        if (principal != null) {
-            Optional<User> user = userRepository.findByUsername(principal.getName());
-            if (user.isPresent() && user.get().getUniversity() != null) {
-                return user.get().getUniversity();
-            }
-        }
-        List<University> all = universityRepository.findAll();
-        return all.isEmpty() ? null : all.get(0);
+    /**
+     * The caller's university.
+     *
+     * <p>Derived from the authenticated account only. An earlier version
+     * preferred an {@code X-University-Domain} request header and fell back to
+     * the first university in the table, which let a caller act on any tenant.
+     */
+    private University getUniversityContext(String ignoredDomainHeader, Principal principal) {
+        return currentUserService.requireUniversity();
     }
 
     // --- Academic Setup (Metadata) ---
@@ -170,6 +177,12 @@ public class UniversityAdminController {
             return ResponseEntity.badRequest().body(Map.of("error", "Username already taken"));
         }
 
+        // An administrator must choose a real password; there is no default.
+        String teacherPasswordError = com.ustc.learnx.common.PasswordPolicy.validate(request.getPassword());
+        if (teacherPasswordError != null) {
+            return ResponseEntity.badRequest().body(Map.of("error", teacherPasswordError));
+        }
+
         String designation = request.getDesignation();
         if (request.isGuest()) {
             designation = designation + " (Guest)";
@@ -177,7 +190,7 @@ public class UniversityAdminController {
 
         User teacher = User.builder()
                 .username(request.getUsername())
-                .password(passwordEncoder.encode(request.getPassword() != null ? request.getPassword() : "password"))
+                .password(passwordEncoder.encode(request.getPassword()))
                 .fullName(request.getFullName())
                 .email(request.getEmail())
                 .role(Role.TEACHER)

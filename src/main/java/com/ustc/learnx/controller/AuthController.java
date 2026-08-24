@@ -130,13 +130,16 @@ public class AuthController {
                 }
             }
             throw new RuntimeException("User not found in repositories");
+        } catch (org.springframework.security.authentication.DisabledException e) {
+            return ResponseEntity.status(403)
+                    .body(Map.of("error", "Your account is pending administrator approval."));
         } catch (Exception e) {
             return ResponseEntity.status(401).body(Map.of("error", "Invalid username or password"));
         }
     }
 
     @PostMapping("/signup")
-    public ResponseEntity<?> signup(@RequestBody SignupRequest request, @RequestHeader(value = "X-University-Domain", required = false) String domainHeader) {
+    public ResponseEntity<?> signup(@RequestBody SignupRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
             return ResponseEntity.badRequest().body(Map.of("error", "Username already exists"));
         }
@@ -152,6 +155,11 @@ public class AuthController {
             }
         } catch (Exception e) {
             userRole = Role.STUDENT; // Default to Student
+        }
+
+        String policyError = com.ustc.learnx.common.PasswordPolicy.validate(request.getPassword());
+        if (policyError != null) {
+            return ResponseEntity.badRequest().body(Map.of("error", policyError));
         }
 
         // Enforce required fields
@@ -176,16 +184,9 @@ public class AuthController {
             }
         }
 
-        University uni = null;
-        if (domainHeader != null && !domainHeader.trim().isEmpty()) {
-            uni = universityRepository.findByDomain(domainHeader).orElse(null);
-        }
-        if (uni == null) {
-            java.util.List<University> all = universityRepository.findAll();
-            if (!all.isEmpty()) {
-                uni = all.get(0);
-            }
-        }
+        // Single-tenant deployment: every new account joins the one university.
+        // This deliberately ignores any client-supplied domain hint.
+        University uni = universityRepository.findAll().stream().findFirst().orElse(null);
 
         boolean approved = false;
 

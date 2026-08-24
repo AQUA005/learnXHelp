@@ -7,10 +7,12 @@ import com.ustc.learnx.repository.ResourceReactionRepository;
 import com.ustc.learnx.repository.ResourceRepository;
 import com.ustc.learnx.repository.UserRepository;
 import lombok.AllArgsConstructor;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -28,6 +30,7 @@ public class ResourceController {
     private final ResourceRepository resourceRepository;
     private final UserRepository userRepository;
     private final ResourceReactionRepository resourceReactionRepository;
+    private final com.ustc.learnx.service.CurrentUserService currentUserService;
 
     @GetMapping("/approved")
     public ResponseEntity<List<Resource>> getApprovedResources(Principal principal) {
@@ -63,6 +66,7 @@ public class ResourceController {
         return ResponseEntity.ok(list);
     }
 
+    @PreAuthorize("hasRole('TEACHER')")
     @GetMapping("/pending")
     public ResponseEntity<List<Resource>> getPendingResources(Principal principal) {
         List<Resource> list = resourceRepository.findByApproved(false);
@@ -141,6 +145,7 @@ public class ResourceController {
         }
     }
 
+    @PreAuthorize("hasRole('TEACHER')")
     @PostMapping("/{id}/approve")
     public ResponseEntity<?> approveResource(@PathVariable Long id) {
         Resource resource = resourceRepository.findById(id).orElse(null);
@@ -152,26 +157,68 @@ public class ResourceController {
         return ResponseEntity.ok(Map.of("message", "Resource approved successfully"));
     }
 
+    /** Uploaders may remove their own material; teachers may remove any of it. */
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteResource(@PathVariable Long id) {
-        if (!resourceRepository.existsById(id)) {
-            return ResponseEntity.notFound().build();
+        Resource resource = resourceRepository.findById(id)
+                .orElseThrow(() -> new com.ustc.learnx.common.NotFoundException("Resource not found"));
+
+        currentUserService.assertSameUniversity(resource.getUniversity());
+
+        User me = currentUserService.requireCurrentUser();
+        boolean isOwner = resource.getUploadedBy() != null
+                && resource.getUploadedBy().getId().equals(me.getId());
+        boolean isModerator = me.getRole() == User.Role.TEACHER || me.getRole() == User.Role.ADMIN;
+        if (!isOwner && !isModerator) {
+            throw new com.ustc.learnx.common.AccessDeniedException("You may only delete your own uploads");
         }
+
         resourceRepository.deleteById(id);
         return ResponseEntity.ok(Map.of("message", "Resource deleted successfully"));
     }
 
     @GetMapping("/download/{id}")
     public ResponseEntity<byte[]> downloadResource(@PathVariable Long id) {
-        Resource resource = resourceRepository.findById(id).orElse(null);
-        if (resource == null || resource.getFileData() == null) {
-            return ResponseEntity.notFound().build();
+        Resource resource = resourceRepository.findById(id)
+                .orElseThrow(() -> new com.ustc.learnx.common.NotFoundException("Resource not found"));
+        if (resource.getFileData() == null) {
+            throw new com.ustc.learnx.common.NotFoundException("Resource has no file attached");
+        }
+
+        // A file is downloadable only within its own university, and only once
+        // approved unless the caller uploaded it or moderates the library.
+        currentUserService.assertSameUniversity(resource.getUniversity());
+        if (!resource.isApproved()) {
+            User me = currentUserService.requireCurrentUser();
+            boolean isOwner = resource.getUploadedBy() != null
+                    && resource.getUploadedBy().getId().equals(me.getId());
+            boolean isModerator = me.getRole() == User.Role.TEACHER || me.getRole() == User.Role.ADMIN;
+            if (!isOwner && !isModerator) {
+                throw new com.ustc.learnx.common.AccessDeniedException("That resource is awaiting approval");
+            }
         }
 
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFileName() + "\"")
-                .contentType(MediaType.parseMediaType(resource.getContentType() != null ? resource.getContentType() : "application/octet-stream"))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment()
+                                .filename(safeFileName(resource.getFileName()))
+                                .build().toString())
+                .contentType(MediaType.parseMediaType(resource.getContentType() != null
+                        ? resource.getContentType() : "application/octet-stream"))
                 .body(resource.getFileData());
+    }
+
+    /** Strips characters that would let a stored filename break out of the header. */
+    private static String safeFileName(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "download";
+        }
+        StringBuilder cleaned = new StringBuilder(raw.length());
+        for (char c : raw.toCharArray()) {
+            cleaned.append((c == 0x0D || c == 0x0A || c == 0x22 || c == 0x5C || c == 0x2F) ? '_' : c);
+        }
+        String result = cleaned.toString().trim();
+        return result.isEmpty() ? "download" : result;
     }
 
     // --- REACTION ENDPOINTS ---

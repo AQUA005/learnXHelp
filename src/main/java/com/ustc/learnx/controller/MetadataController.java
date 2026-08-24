@@ -4,6 +4,7 @@ import com.ustc.learnx.entity.SystemMetadata;
 import com.ustc.learnx.repository.SystemMetadataRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,6 +23,7 @@ public class MetadataController {
         return ResponseEntity.ok(allOptions);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<?> createMetadata(@RequestBody Map<String, String> request) {
         String type = request.get("type");
@@ -46,6 +48,7 @@ public class MetadataController {
         return ResponseEntity.ok(option);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteMetadata(@PathVariable Long id) {
         if (!systemMetadataRepository.existsById(id)) {

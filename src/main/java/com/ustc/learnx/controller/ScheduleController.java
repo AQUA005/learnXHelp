@@ -8,6 +8,7 @@ import com.ustc.learnx.repository.ClassTestRepository;
 import com.ustc.learnx.repository.ScheduleItemRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
@@ -61,6 +62,7 @@ public class ScheduleController {
         return ResponseEntity.ok(scheduleItemRepository.findAll());
     }
 
+    @PreAuthorize("hasRole('CR')")
     @PostMapping("/routine")
     public ResponseEntity<?> addRoutineItem(@RequestBody ScheduleItem item, Principal principal) {
         if (principal == null) {
@@ -103,6 +105,7 @@ public class ScheduleController {
         return ResponseEntity.ok(saved);
     }
 
+    @PreAuthorize("hasRole('CR')")
     @PutMapping("/routine/{id}")
     public ResponseEntity<?> updateRoutineItem(@PathVariable Long id, @RequestBody ScheduleItem updated, Principal principal) {
         if (principal == null) {
@@ -162,6 +165,7 @@ public class ScheduleController {
         return ResponseEntity.ok(saved);
     }
 
+    @PreAuthorize("hasRole('CR')")
     @DeleteMapping("/routine/{id}")
     public ResponseEntity<?> deleteRoutineItem(@PathVariable Long id, Principal principal) {
         if (principal == null) {
@@ -237,6 +241,7 @@ public class ScheduleController {
         return ResponseEntity.ok(classTestRepository.findAllByOrderByDateTimeAsc());
     }
 
+    @PreAuthorize("hasRole('CR')")
     @PostMapping("/ct")
     public ResponseEntity<?> addClassTest(@RequestBody ClassTest ct, Principal principal) {
         if (principal == null) {
@@ -274,6 +279,7 @@ public class ScheduleController {
         return ResponseEntity.ok(saved);
     }
 
+    @PreAuthorize("hasRole('CR')")
     @PutMapping("/ct/{id}")
     public ResponseEntity<?> updateClassTest(@PathVariable Long id, @RequestBody ClassTest updated, Principal principal) {
         ClassTest existing = classTestRepository.findById(id).orElse(null);
@@ -305,6 +311,7 @@ public class ScheduleController {
         return ResponseEntity.ok(saved);
     }
 
+    @PreAuthorize("hasRole('CR')")
     @DeleteMapping("/ct/{id}")
     public ResponseEntity<?> deleteClassTest(@PathVariable Long id, Principal principal) {
         ClassTest existing = classTestRepository.findById(id).orElse(null);
@@ -331,6 +338,7 @@ public class ScheduleController {
 
     // --- Audit Logs endpoints ---
 
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/audit-logs")
     public ResponseEntity<List<AuditLog>> getAuditLogs() {
         return ResponseEntity.ok(auditLogRepository.findAllByOrderByTimestampDesc());

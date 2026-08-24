@@ -7,6 +7,7 @@ import com.ustc.learnx.repository.UserRepository;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
@@ -98,12 +99,14 @@ public class DashboardController {
         return ResponseEntity.ok(stats);
     }
 
+    @PreAuthorize("hasRole('TEACHER')")
     @GetMapping("/all-grades")
     public ResponseEntity<?> getAllGrades() {
         // Return all grades with student usernames for Teacher/CR dashboard view
         return ResponseEntity.ok(gradeBookRepository.findAll());
     }
 
+    @PreAuthorize("hasRole('TEACHER')")
     @PostMapping("/grades")
     public ResponseEntity<?> addGrade(@RequestBody AddGradeRequest request) {
         User student = userRepository.findByUsername(request.getStudentUsername()).orElse(null);
@@ -123,6 +126,7 @@ public class DashboardController {
         return ResponseEntity.ok(saved);
     }
 
+    @PreAuthorize("hasRole('TEACHER')")
     @DeleteMapping("/grades/{id}")
     public ResponseEntity<?> deleteGrade(@PathVariable Long id) {
         if (!gradeBookRepository.existsById(id)) {

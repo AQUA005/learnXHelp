@@ -7,6 +7,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -15,8 +16,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * Platform-owner operations: creating and deleting universities, resetting
+ * tenant administrator passwords, reading bug reports and broadcasting mail.
+ *
+ * <p>Restricted to SYSTEM_ADMIN. Every endpoint here crosses tenant boundaries,
+ * so none of it is reachable by a university administrator.
+ */
 @RestController
 @RequestMapping("/api/master")
+@PreAuthorize("hasRole('SYSTEM_ADMIN')")
 @AllArgsConstructor
 public class MasterAdminController {
 

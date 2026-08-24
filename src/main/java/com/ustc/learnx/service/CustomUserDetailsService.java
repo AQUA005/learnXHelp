@@ -39,6 +39,9 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .username(user.getUsername())
                 .password(user.getPassword())
                 .roles(user.getRole().name())
+                // Pending accounts cannot authenticate at all, rather than
+                // relying on a check inside the login controller.
+                .disabled(!user.isApproved())
                 .build();
     }
 }

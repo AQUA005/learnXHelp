@@ -9,6 +9,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
@@ -59,6 +60,7 @@ public class AnnouncementController {
         return ResponseEntity.ok(announcements);
     }
 
+    @PreAuthorize("hasRole('CR')")
     @PostMapping
     public ResponseEntity<?> createAnnouncement(@RequestBody CreateAnnouncementRequest request, Principal principal) {
         if (principal == null) {
@@ -92,6 +94,7 @@ public class AnnouncementController {
         return ResponseEntity.ok(saved);
     }
 
+    @PreAuthorize("hasRole('CR')")
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteAnnouncement(@PathVariable Long id, Principal principal) {
         if (principal == null) {

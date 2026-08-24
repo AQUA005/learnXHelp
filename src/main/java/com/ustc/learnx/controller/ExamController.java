@@ -8,6 +8,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
@@ -89,6 +90,7 @@ public class ExamController {
         // Excluded: correctAnswer (for students)
     }
 
+    @PreAuthorize("hasRole('TEACHER')")
     @PostMapping("/create")
     public ResponseEntity<?> createExam(@RequestBody CreateExamRequest request, Principal principal) {
         User teacher = userRepository.findByUsername(principal.getName()).orElse(null);
@@ -289,6 +291,7 @@ public class ExamController {
         }
     }
 
+    @PreAuthorize("hasRole('TEACHER')")
     @GetMapping("/{id}/submissions")
     public ResponseEntity<?> getExamSubmissions(@PathVariable Long id, Principal principal) {
         User user = userRepository.findByUsername(principal.getName()).orElse(null);
