@@ -237,6 +237,9 @@ As the administrator, open **Administration**:
   pre-filled with sensible defaults; change them to match USTC.
 - **Account approvals** — every sign-up lands here. Nobody can sign in until you
   approve them. This is the main thing you will do day to day.
+- **People** — everyone at the university, and the way back in for someone who
+  cannot sign in. Resetting a password here shows the new one once, for you to
+  pass on. This works whether or not email is set up.
 - **Classes** — class groups, and promoting a cohort to the next semester.
 
 Then tell students to sign up, and approve them as they arrive.
@@ -246,21 +249,65 @@ Then tell students to sign up, and approve them as they arrive.
 ## Optional: sending email
 
 Email is used for two things: telling someone their sign-up is being reviewed,
-and password recovery. **Everything else works without it.** If you skip this,
-users who forget their password will need you to help them.
+and letting people reset their own password. **Everything else works without
+it** — sign-up, approval, routines, notes, announcements, exams and grades are
+all unaffected, and an unreachable mail server deliberately does not mark the
+service unhealthy, so it will never restart your site.
 
-To enable it, add:
+The only thing you lose is self-service password recovery, and an administrator
+can reset anyone's password directly from **Administration > People**. So this
+is genuinely optional; set it up when convenient.
+
+### What you actually need
+
+The application only ever **sends**. It never receives, so a full mailbox is
+more than it requires. What it needs is a *transactional email* service: an SMTP
+host, a username and a password.
+
+That matters because a mailbox and a sending service are priced very
+differently. If your mailbox subscription lapsed, you do not have to renew it
+just to make password recovery work again.
+
+**Terms and free allowances change** — check the provider's current pricing
+rather than trusting this table.
+
+| Service | Shape of the free tier | Notes |
+|---|---|---|
+| **Brevo** | A few hundred messages a day | Straightforward SMTP credentials |
+| **Resend** | A few thousand a month | Simple to set up; SMTP as well as an API |
+| **Mailjet** | A few thousand a month | Long-standing SMTP provider |
+| **Amazon SES** | Not free, but priced per thousand and very cheap | Cheapest at volume; the most setup, and new accounts start restricted |
+| **Zoho Mail** | Free tier for a custom domain | Choose this if you also want a *mailbox* at your domain, not only sending |
+| **Gmail** | Free | Works, but sends from your personal address rather than your domain, and needs an App Password |
+
+For a single university this is well inside every free tier: a handful of
+messages a day at most.
+
+### Setting it up
+
+Whichever you choose, they give you a host, a username and a password. Put them
+in Render under **Environment**:
 
 | Key | Value |
 |---|---|
-| `SPRING_MAIL_HOST` | Your provider's SMTP host |
+| `SPRING_MAIL_HOST` | The SMTP host they give you |
 | `SPRING_MAIL_PORT` | `587` |
-| `SPRING_MAIL_USERNAME` | The mailbox address |
-| `SPRING_MAIL_PASSWORD` | An **app password**, not your normal login password |
+| `SPRING_MAIL_USERNAME` | The username they give you |
+| `SPRING_MAIL_PASSWORD` | The password or API key they give you |
 
-With Gmail you must turn on 2-step verification and create an App Password;
-Gmail rejects your ordinary password. Deliberately, an unreachable mail server
-does **not** mark the service unhealthy — it will not restart your site.
+With Gmail specifically, turn on 2-step verification and create an **App
+Password**. Gmail rejects your ordinary password.
+
+### Making the mail arrive
+
+A message sent from a new service to a domain that has not authorised it tends
+to land in spam. Every provider above will ask you to add one or two records to
+your domain's DNS — usually SPF and DKIM — and will show you exactly what to
+add. It takes a few minutes and is worth doing; without it, password-recovery
+codes quietly go missing.
+
+If you no longer control the DNS for the domain, send from an address at a
+domain you do control instead.
 
 ---
 
