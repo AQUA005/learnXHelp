@@ -301,13 +301,40 @@ Point `DATABASE_URL` at a database with nothing in it. The migrations then build
 all 19 tables, seed the university and the dropdown lists, and create your
 administrator.
 
-If you are moving to Neon or another provider anyway, you already have one —
-just use it, and this problem disappears.
+**This needs no SQL and no terminal.** If you are moving to Neon or another
+provider anyway, you already have an empty database:
+
+1. Create the database at the provider
+2. Copy the connection string it gives you
+3. In Render, open the `learnx` service > **Environment**, edit `DATABASE_URL`,
+   paste, and **Save Changes**
+4. Render redeploys by itself
+
+The old database is simply left behind. Everything below is only needed if you
+want to inspect or reuse it.
+
+### Where to run SQL
+
+The commands further down are SQL, and Render has no box in the browser to type
+them into. You need something that can connect to a PostgreSQL database. In
+rough order of least effort:
+
+- **Your provider's own SQL editor.** Neon and Supabase both include one in their
+  dashboard — look for *SQL Editor*. Nothing to install. This is the easiest
+  option, but it only reaches *their* database, not one hosted on Render.
+- **A free desktop client**, such as [DBeaver](https://dbeaver.io) or
+  [pgAdmin](https://www.pgadmin.org). Install it, create a connection, and paste
+  in the **External Database URL** from the Render database page. Use External,
+  not Internal — Internal only works from inside Render.
+- **The `psql` command line**, if you have PostgreSQL installed locally. The
+  database page in Render shows a ready-made `psql` command to copy.
+
+Whichever you use, the connection string contains the database password. Do not
+paste it into a website that offers to run queries for you.
 
 ### First, check whether the old database holds anything you want
 
-Only you can answer this. On the database's page in Render, open **Connect** and
-copy the `psql` command, then:
+Only you can answer this. Connect using one of the methods above, then run:
 
 ```sql
 SELECT
@@ -328,8 +355,9 @@ SELECT
 
 ### Reusing the same database instead
 
-If you would rather keep the same database than create a new one, empty it. This
-**erases everything in it**, so take the backup above first.
+If you would rather keep the same database than create a new one, empty it using
+one of the tools in [Where to run SQL](#where-to-run-sql). This **erases
+everything in it**, so take the backup above first.
 
 ```sql
 DROP SCHEMA public CASCADE;
@@ -368,7 +396,7 @@ The database holds everything that matters. Paid Render plans take automatic
 backups; on free, take your own before any risky change:
 
 1. Database page > **Connect** > copy the **External Database URL**
-2. With PostgreSQL tools installed locally:
+2. With PostgreSQL tools installed locally (see [Where to run SQL](#where-to-run-sql)):
 
 ```bash
 pg_dump "PASTE_EXTERNAL_URL_HERE" > learnx-backup.sql
