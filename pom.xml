@@ -44,6 +44,10 @@
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-flyway</artifactId>
 		</dependency>
 		<dependency>
@@ -151,7 +155,9 @@
 				<executions>
 					<execution>
 						<id>copy-frontend</id>
-						<phase>prepare-package</phase>
+						<!-- Before tests, so the packaged shell is on the classpath
+						     when they run, as it is at runtime. -->
+						<phase>process-resources</phase>
 						<goals><goal>copy-resources</goal></goals>
 						<configuration>
 							<outputDirectory>${project.build.outputDirectory}/static</outputDirectory>

@@ -5,9 +5,9 @@ announcements and class tests, online exams, and a gradebook.
 
 ## Stack
 
-- Java 21, Spring Boot 4.0.6 (Web, Security, Data JPA, Validation, Mail, Flyway)
-- PostgreSQL, with schema owned by Flyway migrations
-- Frontend: static SPA under `src/main/resources/static` (React + Vite rewrite planned)
+- Java 21, Spring Boot 4.0.6 (Web, Security, Data JPA, Validation, Mail, Flyway, Actuator)
+- PostgreSQL, with the schema owned by Flyway migrations
+- React 19, TypeScript and Vite under `frontend/`, built into the same jar
 
 ## Running locally
 
@@ -36,8 +36,10 @@ SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/learnx SPRING_DATASOURCE_
 ## Testing
 
 ```bash
-./mvnw test
+./mvnw verify
 ```
+
+This also builds, type-checks and lints the frontend.
 
 Tests run the real Flyway migrations against H2 in PostgreSQL compatibility mode and
 boot with `ddl-auto=validate`, so a mismatch between an entity and the schema fails the
@@ -68,6 +70,20 @@ All settings are environment variables. No secrets live in the repo.
 | `SPRING_MAIL_HOST` / `_PORT` | SMTP endpoint | `smtp.gmail.com` / `587` |
 | `SPRING_MAIL_USERNAME` / `_PASSWORD` | SMTP credentials | *(empty)* |
 
+## Operations
+
+`GET /actuator/health` answers without a session, for container and load
+balancer probes. Everything else under `/actuator` requires an administrator.
+Mail is excluded from the health check on purpose: the application serves every
+other feature without it, and an unreachable SMTP host should not restart a
+working service.
+
+Every response carries an `X-Request-Id`, and that id plus the caller's username
+are attached to each log line written while handling the request. Under the
+`prod` profile logs are emitted as structured JSON. Sign-ins and failed sign-in
+attempts are written to the audit table alongside schedule changes; the
+attempted password never is.
+
 ## Architecture notes
 
 **Schema.** Owned by `src/main/resources/db/migration`. Hibernate never alters it —
@@ -89,3 +105,25 @@ The deployment serves one university, seeded by migration `V2`, but rows carry a
 
 **Associations are lazy.** Queries that feed an endpoint declare what they need with
 `@EntityGraph`, so a listing costs a fixed number of queries rather than one per row.
+
+**The frontend** lives in `frontend/` and is built by the Maven build, so
+`./mvnw package` produces one jar containing both the API and the interface.
+For frontend work with hot reloading, run the backend and then:
+
+```bash
+cd frontend && npm run dev
+```
+
+Vite serves on port 5173 and proxies `/api` to the application on 8080, so the
+session cookie and CSRF token behave exactly as they do in production.
+
+Text is rendered as text by React rather than assembled into markup, and a lint
+rule rejects `dangerouslySetInnerHTML`, so untrusted content cannot become
+markup.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs `./mvnw verify` (which applies the migrations,
+validates every entity mapping against them, and builds the frontend), then a
+Playwright smoke test against the packaged jar, and on `main` publishes a
+container image to GHCR.

@@ -43,6 +43,11 @@ public class SecurityConfig {
             "/performance", "/gradebook", "/moderation", "/admin", "/profile"
     };
 
+    /** Reachable without a session so a container can probe the service. */
+    private static final String[] PUBLIC_PROBES = {
+            "/actuator/health", "/actuator/health/**"
+    };
+
     /** Endpoints that must work before a session exists. */
     private static final String[] PUBLIC_ENDPOINTS = {
             "/api/auth/login",
@@ -116,6 +121,9 @@ public class SecurityConfig {
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers(PUBLIC_PROBES).permitAll()
+                // Everything else under /actuator is operational detail.
+                .requestMatchers("/actuator/**").hasRole("ADMIN")
                 .requestMatchers(PUBLIC_ASSETS).permitAll()
                 .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                 // Everything else — including /api/admin/** and /api/master/**,
