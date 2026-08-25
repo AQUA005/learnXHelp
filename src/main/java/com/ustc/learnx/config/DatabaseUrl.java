@@ -2,8 +2,6 @@ package com.ustc.learnx.config;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
-import java.net.URLDecoder;
 import java.util.Map;
 import java.util.Optional;
 
@@ -79,14 +77,19 @@ public final class DatabaseUrl {
 
         String username = null;
         String password = null;
+        // getUserInfo has already resolved any percent-escapes. Decoding again
+        // would corrupt the credentials: a second pass reads '+' as a space,
+        // which is the rule for form data, not for a URI. A password containing
+        // a plus sign would then be silently wrong and authentication would
+        // fail with nothing to suggest why.
         String userInfo = uri.getUserInfo();
         if (hasText(userInfo)) {
             int separator = userInfo.indexOf(':');
             if (separator >= 0) {
-                username = decode(userInfo.substring(0, separator));
-                password = decode(userInfo.substring(separator + 1));
+                username = userInfo.substring(0, separator);
+                password = userInfo.substring(separator + 1);
             } else {
-                username = decode(userInfo);
+                username = userInfo;
             }
         }
 
@@ -109,10 +112,6 @@ public final class DatabaseUrl {
             }
         }
         return null;
-    }
-
-    private static String decode(String value) {
-        return URLDecoder.decode(value, StandardCharsets.UTF_8);
     }
 
     private static boolean hasText(String value) {

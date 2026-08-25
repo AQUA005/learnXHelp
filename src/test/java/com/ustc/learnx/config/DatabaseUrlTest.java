@@ -56,6 +56,42 @@ class DatabaseUrlTest {
         assertThat(settings.orElseThrow().password()).isEqualTo("p@ss/word");
     }
 
+    /**
+     * A plus sign in a password is a plus sign.
+     *
+     * <p>It once became a space, because the credentials were decoded a second
+     * time after the URI had already resolved them, and that second pass applied
+     * the rule for form data rather than for a URI. The only symptom was
+     * "password authentication failed", with nothing to suggest the application
+     * had altered the password.
+     */
+    @Test
+    void keepsAPlusSignInThePassword() {
+        Optional<JdbcSettings> settings = DatabaseUrl.from(Map.of(
+                "DATABASE_URL", "postgresql://user:ab+cd+ef@host.example.com/db"));
+
+        assertThat(settings.orElseThrow().password()).isEqualTo("ab+cd+ef");
+    }
+
+    /** Nor may a percent-escape be resolved twice. */
+    @Test
+    void doesNotDecodeAPasswordTwice() {
+        // %2520 is an escaped '%20'. One pass gives '%20'; a second would give a space.
+        Optional<JdbcSettings> settings = DatabaseUrl.from(Map.of(
+                "DATABASE_URL", "postgresql://user:pa%2520ss@host.example.com/db"));
+
+        assertThat(settings.orElseThrow().password()).isEqualTo("pa%20ss");
+    }
+
+    /** The username is subject to the same rule. */
+    @Test
+    void keepsAPlusSignInTheUsername() {
+        Optional<JdbcSettings> settings = DatabaseUrl.from(Map.of(
+                "DATABASE_URL", "postgresql://od+d:pw@host.example.com/db"));
+
+        assertThat(settings.orElseThrow().username()).isEqualTo("od+d");
+    }
+
     /** An explicitly configured datasource stays in charge. */
     @Test
     void leavesAnExplicitDatasourceAlone() {

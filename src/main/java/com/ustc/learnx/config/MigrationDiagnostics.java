@@ -60,14 +60,56 @@ public class MigrationDiagnostics {
                             anything worth keeping, and how to empty it if you want to reuse
                             it.
                             ------------------------------------------------------------------""");
+                } else if (mentionsAuthenticationFailure(e)) {
+                    log.error("""
+
+                            ------------------------------------------------------------------
+                            The database refused the username and password in DATABASE_URL.
+
+                            The host was reached, so the address is right and only the
+                            credentials are wrong. Things worth checking, commonest first:
+
+                            1. The password may have been masked when it was copied. Some
+                               dashboards hide it behind dots until you reveal it, and a
+                               connection string copied while hidden carries the dots.
+                            2. The whole string must be present, from postgres:// through to
+                               the end of any ?options. A value cut short at a line break is
+                               easy to miss.
+                            3. Resetting the password at the provider invalidates the old
+                               connection string. Copy it again after any reset.
+                            4. If the provider offers pooled and direct strings, either works,
+                               but take the whole one rather than mixing the two.
+
+                            The expected shape is:
+                              postgresql://USER:PASSWORD@HOST/DATABASE?sslmode=require
+                            ------------------------------------------------------------------""");
                 }
                 throw e;
             }
         };
     }
 
+    /**
+     * PostgreSQL reports a rejected password as SQLSTATE 28P01. Matched on the
+     * code rather than the message, which is localised.
+     */
+    // Package-private so the matching can be tested without a live database.
+    static boolean mentionsAuthenticationFailure(Throwable error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (cause instanceof java.sql.SQLException sql
+                    && "28P01".equals(sql.getSQLState())) {
+                return true;
+            }
+            String message = cause.getMessage();
+            if (message != null && message.contains("28P01")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** Matches the wording Flyway uses when a schema has tables but no history. */
-    private static boolean mentionsMissingHistoryTable(Throwable error) {
+    static boolean mentionsMissingHistoryTable(Throwable error) {
         for (Throwable cause = error; cause != null; cause = cause.getCause()) {
             String message = cause.getMessage();
             if (message != null
