@@ -1,0 +1,35 @@
+# Local development stack: PostgreSQL only.
+#
+# Run the application from your IDE or with ./mvnw spring-boot:run against it:
+#
+#   docker compose up -d
+#   SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/learnx \
+#   SPRING_DATASOURCE_USERNAME=learnx \
+#   SPRING_DATASOURCE_PASSWORD=learnx \
+#   ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+#
+# With no datasource variables set the application falls back to a local H2
+# file, so this stack is optional for day-to-day work. Use it to exercise the
+# migrations against the real database before deploying.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: learnx-postgres
+    environment:
+      POSTGRES_DB: learnx
+      POSTGRES_USER: learnx
+      # Development only. Production credentials come from the environment.
+      POSTGRES_PASSWORD: learnx
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U learnx -d learnx"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
