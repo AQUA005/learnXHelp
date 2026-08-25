@@ -139,7 +139,7 @@ class AuthorizationMatrixTest {
     }
 
     @ParameterizedTest(name = "public asset {0} is served")
-    @CsvSource({"/", "/app.js", "/style.css"})
+    @CsvSource({"/", "/index.html"})
     void publicAssetsRemainReachable(String path) throws Exception {
         mvc.perform(get(path)).andExpect(status().isOk());
     }

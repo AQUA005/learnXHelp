@@ -52,3 +52,7 @@ application-secrets.properties
 ### Frontend (added in Phase 4) ###
 frontend/node_modules/
 frontend/dist/
+
+### Frontend toolchain downloaded by the Maven build ###
+frontend/node
+frontend/*.tsbuildinfo

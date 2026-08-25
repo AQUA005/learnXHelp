@@ -35,9 +35,12 @@ public class SecurityConfig {
 
     /** Static assets that make up the SPA shell. */
     private static final String[] PUBLIC_ASSETS = {
-            "/", "/index.html", "/app.js", "/style.css",
-            "/learnx_logo.png", "/ustc_building.jpg", "/favicon.ico",
-            "/assets/**"
+            "/", "/index.html", "/favicon.ico",
+            "/assets/**", "/learnx_logo.png", "/ustc_building.jpg",
+            // Client-side routes resolve to the shell, so they must be
+            // reachable before sign-in for the login screen to render.
+            "/schedule", "/notes", "/announcements", "/exams", "/exams/**",
+            "/performance", "/gradebook", "/moderation", "/admin", "/profile"
     };
 
     /** Endpoints that must work before a session exists. */
@@ -89,8 +92,10 @@ public class SecurityConfig {
                 .contentSecurityPolicy(csp -> csp.policyDirectives(
                         "default-src 'self'; "
                         + "script-src 'self'; "
-                        + "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
-                        + "font-src 'self' https://cdnjs.cloudflare.com; "
+                        // Inline styles remain allowed because the client sets a
+                        // few computed values as element styles.
+                        + "style-src 'self' 'unsafe-inline'; "
+                        + "font-src 'self'; "
                         + "img-src 'self' data:; "
                         + "connect-src 'self'; "
                         + "object-src 'none'; "
