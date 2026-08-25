@@ -1,101 +1,63 @@
 package com.ustc.learnx.controller;
 
-import com.ustc.learnx.entity.ProfileChangeRequest;
-import com.ustc.learnx.entity.User;
-import com.ustc.learnx.repository.ProfileChangeRequestRepository;
-import com.ustc.learnx.repository.UserRepository;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.springframework.http.HttpStatus;
+import com.ustc.learnx.service.ProfileService;
+import jakarta.validation.constraints.Size;
+import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.security.Principal;
+import java.time.Duration;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/profile")
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class ProfileController {
 
-    private final UserRepository userRepository;
-    private final ProfileChangeRequestRepository profileChangeRequestRepository;
+    private final ProfileService profileService;
 
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ProfileUpdateRequest {
-        private String fullName;
-        private String email;
-        private String idNo;
-        private String department;
-        private String batch;
-        private String semester;
-        private String section;
-        private String designation;
-        private String profilePicUrl;
+    public record ProfileUpdateRequest(
+            @Size(max = 255, message = "Name is too long") String fullName,
+            String email,
+            String idNo,
+            String department,
+            String batch,
+            String semester,
+            String section,
+            String designation,
+            /** A data URL holding the new avatar, when one is being changed. */
+            String profilePicUrl) {
     }
 
     @PostMapping("/update")
-    public ResponseEntity<?> updateProfile(@RequestBody ProfileUpdateRequest request, Principal principal) {
-        if (principal == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Not authenticated"));
-        }
-        User currentUser = userRepository.findByUsername(principal.getName()).orElse(null);
-        if (currentUser == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "User not found"));
-        }
+    public ResponseEntity<?> updateProfile(@RequestBody ProfileUpdateRequest request) {
+        ProfileService.UpdateOutcome outcome = profileService.update(
+                request.fullName(), request.profilePicUrl(),
+                request.email(), request.idNo(), request.department(),
+                request.batch(), request.semester(), request.section(),
+                request.designation());
 
-        boolean nameChanged = false;
-        if (request.getFullName() != null && !request.getFullName().trim().isEmpty() && !request.getFullName().equals(currentUser.getFullName())) {
-            currentUser.setFullName(request.getFullName().trim());
-            nameChanged = true;
-        }
+        String message = outcome.approvalRequired()
+                ? "Sensitive changes submitted. Administrator approval is required before they take effect."
+                : "Profile updated successfully.";
 
-        // Instantly update the non-sensitive profile photo if provided
-        if (request.getProfilePicUrl() != null) {
-            currentUser.setProfilePicUrl(request.getProfilePicUrl());
-        }
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("message", message);
+        body.put("profilePicUrl", outcome.profilePicUrl());
+        return ResponseEntity.ok(body);
+    }
 
-        if (nameChanged || request.getProfilePicUrl() != null) {
-            userRepository.save(currentUser);
-        }
-
-        boolean changed = false;
-        
-        if (request.getEmail() != null && !request.getEmail().equals(currentUser.getEmail())) changed = true;
-        if (request.getIdNo() != null && !request.getIdNo().equals(currentUser.getIdNo())) changed = true;
-        if (request.getDepartment() != null && !request.getDepartment().equals(currentUser.getDepartment())) changed = true;
-        if (request.getBatch() != null && !request.getBatch().equals(currentUser.getBatch())) changed = true;
-        if (request.getSemester() != null && !request.getSemester().equals(currentUser.getSemester())) changed = true;
-        if (request.getSection() != null && !request.getSection().equals(currentUser.getSection())) changed = true;
-        if (request.getDesignation() != null && !request.getDesignation().equals(currentUser.getDesignation())) changed = true;
-
-        if (!changed) {
-            return ResponseEntity.ok(Map.of(
-                "message", "Profile updated successfully.",
-                "user", currentUser
-            ));
-        }
-
-        ProfileChangeRequest changeRequest = ProfileChangeRequest.builder()
-                .user(currentUser)
-                .newFullName(currentUser.getFullName())
-                .newEmail(request.getEmail())
-                .newIdNo(request.getIdNo())
-                .newDepartment(request.getDepartment())
-                .newBatch(request.getBatch())
-                .newSemester(request.getSemester())
-                .newSection(request.getSection())
-                .newDesignation(request.getDesignation())
-                .build();
-
-        profileChangeRequestRepository.save(changeRequest);
-
-        return ResponseEntity.ok(Map.of(
-            "message", "Sensitive changes submitted. Administrator approval is required before they take effect.",
-            "user", currentUser
-        ));
+    /** Serves a member's avatar from storage. */
+    @GetMapping("/avatar/{userId}")
+    public ResponseEntity<Resource> getAvatar(@PathVariable Long userId) {
+        ProfileService.Avatar avatar = profileService.loadAvatar(userId);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(avatar.contentType()))
+                // Avatars change rarely, and the URL is per user.
+                .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())
+                .body(avatar.content());
     }
 }

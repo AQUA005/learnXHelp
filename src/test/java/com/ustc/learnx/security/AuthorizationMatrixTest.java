@@ -270,7 +270,7 @@ class AuthorizationMatrixTest {
             "title":"t","content":"c","courseName":"c","type":"DEPARTMENT","value":"v",\
             "dayOfWeek":"MONDAY","startTime":"10:00:00","endTime":"11:00:00",\
             "dateTime":"2026-09-01T10:00:00","studentUsername":"student",\
-            "assessmentName":"CT 1"}""";
+            "assessmentName":"CT 1","to":"student@ustc.test","subject":"s","body":"b"}""";
 
     /**
      * Exams carry their times as ISO date-time strings, where a schedule item

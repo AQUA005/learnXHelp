@@ -33,6 +33,7 @@ public class UserApprovalController {
     private final PasswordEncoder passwordEncoder;
     private final org.springframework.mail.javamail.JavaMailSender mailSender;
     private final org.springframework.core.env.Environment env;
+    private final com.ustc.learnx.service.CurrentUserService currentUserService;
 
     @GetMapping("/pending")
     public ResponseEntity<?> getPendingUsers(Principal principal) {
@@ -45,7 +46,11 @@ public class UserApprovalController {
         }
 
         Role currentRole = currentUser.getRole();
-        List<User> allUsers = userRepository.findAll();
+        // Scoped to the approver's own university. Listing every user let an
+        // administrator of one tenant see and act on another's accounts.
+        List<User> allUsers = currentUser.getUniversity() == null
+                ? List.of()
+                : userRepository.findByApprovedFalseAndUniversity_Id(currentUser.getUniversity().getId());
         List<Map<String, Object>> pending = new ArrayList<>();
 
         for (User u : allUsers) {
@@ -98,6 +103,8 @@ public class UserApprovalController {
         if (targetUser == null) {
             return ResponseEntity.notFound().build();
         }
+        // The target must belong to the same university as the approver.
+        currentUserService.assertSameUniversity(targetUser.getUniversity());
 
         Role currentRole = currentUser.getRole();
         Role targetRole = targetUser.getRole();
@@ -180,6 +187,8 @@ public class UserApprovalController {
         if (targetUser == null) {
             return ResponseEntity.notFound().build();
         }
+        // The target must belong to the same university as the approver.
+        currentUserService.assertSameUniversity(targetUser.getUniversity());
 
         Role currentRole = currentUser.getRole();
         Role targetRole = targetUser.getRole();

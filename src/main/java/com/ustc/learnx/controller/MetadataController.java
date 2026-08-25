@@ -1,8 +1,11 @@
 package com.ustc.learnx.controller;
 
+import com.ustc.learnx.common.NotFoundException;
+import com.ustc.learnx.common.ValidationException;
 import com.ustc.learnx.entity.SystemMetadata;
 import com.ustc.learnx.repository.SystemMetadataRepository;
-import lombok.AllArgsConstructor;
+import com.ustc.learnx.service.CurrentUserService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -10,51 +13,77 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * The lists behind the signup and class-administration dropdowns:
+ * departments, semesters, batches and staff designations.
+ */
 @RestController
 @RequestMapping("/api/metadata")
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class MetadataController {
 
+    /** The only lists the application recognises. */
+    private static final List<String> ALLOWED_TYPES =
+            List.of("SEMESTER", "DEPARTMENT", "BATCH", "SECTION", "DESIGNATION");
+
     private final SystemMetadataRepository systemMetadataRepository;
+    private final CurrentUserService currentUserService;
+
+    public record MetadataResponse(Long id, String type, String value) {
+    }
 
     @GetMapping
-    public ResponseEntity<?> getAllMetadata() {
-        List<SystemMetadata> allOptions = systemMetadataRepository.findAll();
-        return ResponseEntity.ok(allOptions);
+    public ResponseEntity<List<MetadataResponse>> getAllMetadata() {
+        Long universityId = currentUserService.currentUser()
+                .map(u -> u.getUniversity() == null ? null : u.getUniversity().getId())
+                .orElse(null);
+
+        List<SystemMetadata> options = systemMetadataRepository.findAll().stream()
+                .filter(m -> universityId == null
+                        || m.getUniversity() == null
+                        || universityId.equals(m.getUniversity().getId()))
+                .toList();
+
+        return ResponseEntity.ok(options.stream()
+                .map(m -> new MetadataResponse(m.getId(), m.getType(), m.getValue()))
+                .toList());
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
-    public ResponseEntity<?> createMetadata(@RequestBody Map<String, String> request) {
+    public ResponseEntity<MetadataResponse> createMetadata(@RequestBody Map<String, String> request) {
         String type = request.get("type");
         String value = request.get("value");
 
-        if (type == null || type.trim().isEmpty() || value == null || value.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Type and value are required."));
+        if (type == null || type.isBlank() || value == null || value.isBlank()) {
+            throw new ValidationException("Type and value are required");
         }
 
-        // Standardize types
-        String typeUpper = type.trim().toUpperCase();
-        if (!List.of("SEMESTER", "DEPARTMENT", "BATCH", "DESIGNATION").contains(typeUpper)) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Invalid metadata type. Must be SEMESTER, DEPARTMENT, BATCH, or DESIGNATION."));
+        String normalisedType = type.trim().toUpperCase();
+        if (!ALLOWED_TYPES.contains(normalisedType)) {
+            throw new ValidationException(
+                    "Type must be one of " + String.join(", ", ALLOWED_TYPES));
         }
 
-        SystemMetadata option = SystemMetadata.builder()
-                .type(typeUpper)
+        SystemMetadata saved = systemMetadataRepository.save(SystemMetadata.builder()
+                .type(normalisedType)
                 .value(value.trim())
-                .build();
+                // Without this the entry belongs to no university, and the
+                // scoped lookups behind the signup form never return it.
+                .university(currentUserService.requireUniversity())
+                .build());
 
-        systemMetadataRepository.save(option);
-        return ResponseEntity.ok(option);
+        return ResponseEntity.ok(new MetadataResponse(saved.getId(), saved.getType(), saved.getValue()));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteMetadata(@PathVariable Long id) {
-        if (!systemMetadataRepository.existsById(id)) {
-            return ResponseEntity.notFound().build();
-        }
-        systemMetadataRepository.deleteById(id);
-        return ResponseEntity.ok(Map.of("message", "Metadata option deleted successfully."));
+        SystemMetadata option = systemMetadataRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Metadata option not found"));
+        currentUserService.assertSameUniversity(option.getUniversity());
+
+        systemMetadataRepository.delete(option);
+        return ResponseEntity.ok(Map.of("message", "Metadata option deleted"));
     }
 }

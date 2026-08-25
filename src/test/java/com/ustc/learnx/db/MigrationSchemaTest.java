@@ -39,7 +39,9 @@ class MigrationSchemaTest {
                         + "WHERE \"success\" = TRUE AND \"version\" IS NOT NULL "
                         + "ORDER BY \"installed_rank\"",
                 String.class);
-        assertThat(versions).containsExactly("1", "2");
+        // Update this list when adding a migration, so a script that fails to
+        // apply cannot pass unnoticed.
+        assertThat(versions).containsExactly("1", "2", "3");
     }
 
     /** Tables the application cannot function without. */

@@ -41,8 +41,19 @@ public class User {
     private String semester;
     private String section;
     private String designation;
+    /**
+     * Where the avatar can be fetched from, or null when there is none.
+     *
+     * <p>A path served by the application, not image data. This column used to
+     * hold an unbounded base64 data URL that travelled with every fetch of the
+     * account.
+     */
     @Column(columnDefinition = "TEXT")
     private String profilePicUrl;
+
+    /** Location of the avatar within the storage root. */
+    @Column(name = "profile_pic_key", length = 200)
+    private String profilePicKey;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "student_class_id")
