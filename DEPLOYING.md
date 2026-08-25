@@ -264,6 +264,80 @@ does **not** mark the service unhealthy — it will not restart your site.
 
 ---
 
+---
+
+## If the deploy fails with "non-empty schema but no schema history table"
+
+The full message reads:
+
+```
+Found non-empty schema(s) "public" but no schema history table.
+Use baseline() or set baselineOnMigrate to true to initialize the schema history table.
+```
+
+**This is the migrations protecting you, not a fault.**
+
+The database already contains tables, but none that Flyway created. That happens
+when the database was used by an earlier version of LearnX, which let Hibernate
+build the schema by itself. This version owns the schema through the numbered
+files in `src/main/resources/db/migration`, and it will not touch tables it did
+not create.
+
+### Do not set `baselineOnMigrate`
+
+The message suggests it, and it is the wrong advice here. It tells Flyway to
+assume whatever is present is already version 1, so `V1` — the file that creates
+every table correctly — is skipped, and `V2` and `V3` are applied on top of the
+old structure instead.
+
+The two are not interchangeable. The old schema has a `system_admins` table that
+no longer exists, keeps uploaded files in a `resources.file_data` column that has
+been removed, and lacks `profile_pic_key`. The result is either a refusal to
+start, or a half-migrated database that fails later and less clearly.
+
+### The fix: start from an empty database
+
+Point `DATABASE_URL` at a database with nothing in it. The migrations then build
+all 19 tables, seed the university and the dropdown lists, and create your
+administrator.
+
+If you are moving to Neon or another provider anyway, you already have one —
+just use it, and this problem disappears.
+
+### First, check whether the old database holds anything you want
+
+Only you can answer this. On the database's page in Render, open **Connect** and
+copy the `psql` command, then:
+
+```sql
+SELECT
+  (SELECT COUNT(*) FROM users)           AS accounts,
+  (SELECT COUNT(*) FROM schedule_items)  AS routine_entries,
+  (SELECT COUNT(*) FROM resources)       AS uploads;
+```
+
+- **All zeros, or only test accounts?** Nothing to keep. Use a fresh database.
+- **Real students and real routines?** Take a backup before anything else:
+
+  ```bash
+  pg_dump "PASTE_EXTERNAL_DATABASE_URL" > learnx-old.sql
+  ```
+
+  Keep that file. Moving it into the new schema is a separate job — the two
+  structures differ — but with the dump in hand nothing is lost while you decide.
+
+### Reusing the same database instead
+
+If you would rather keep the same database than create a new one, empty it. This
+**erases everything in it**, so take the backup above first.
+
+```sql
+DROP SCHEMA public CASCADE;
+CREATE SCHEMA public;
+```
+
+Then redeploy. The log should show the three migrations running in order.
+
 ## When something goes wrong
 
 Open **Logs** on the web service and look for the first line containing `ERROR`.
@@ -277,6 +351,7 @@ Open **Logs** on the web service and look for the first line containing `ERROR`.
 | `too many clients already` | The pool is larger than the free tier allows | Set `DB_POOL_SIZE` to `3` and redeploy |
 | `No accounts exist and no bootstrap administrator is configured` | Locked out | Set `LEARNX_ADMIN_USERNAME` / `_PASSWORD` / `_EMAIL`, then deploy again |
 | `The bootstrap administrator password was rejected` | Password too weak | At least 8 characters, with a letter and a number |
+| `Found non-empty schema(s) "public" but no schema history table` | The database was used by an older version of LearnX | See [the section above](#if-the-deploy-fails-with-non-empty-schema-but-no-schema-history-table). Do not set `baselineOnMigrate` |
 | `Schema-validation: missing table` | Migrations did not run | Check the log for a Flyway error above this line |
 | Site loads but every sign-in fails | Usually a stale session | Try a private browsing window |
 | Uploaded files vanish after a deploy | No disk attached | Step 4 |
