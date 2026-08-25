@@ -15,4 +15,13 @@ public interface GradeBookRepository extends JpaRepository<GradeBook, Long> {
     List<GradeBook> findByStudent(User student);
     @EntityGraph(attributePaths = {"student", "student.studentClass", "student.university"})
     List<GradeBook> findByCourseNameAndAssessmentName(String courseName, String assessmentName);
+
+    /** Grades for one assessment within a single university, for ranking. */
+    @EntityGraph(attributePaths = {"student"})
+    List<GradeBook> findByCourseNameAndAssessmentNameAndStudent_University_Id(
+            String courseName, String assessmentName, Long universityId);
+
+    /** Every grade recorded in one university. */
+    @EntityGraph(attributePaths = {"student", "student.studentClass"})
+    List<GradeBook> findByStudent_University_Id(Long universityId);
 }

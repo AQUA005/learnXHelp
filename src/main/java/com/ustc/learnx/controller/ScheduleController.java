@@ -1,346 +1,88 @@
 package com.ustc.learnx.controller;
 
-import com.ustc.learnx.entity.AuditLog;
-import com.ustc.learnx.entity.ClassTest;
-import com.ustc.learnx.entity.ScheduleItem;
-import com.ustc.learnx.repository.AuditLogRepository;
-import com.ustc.learnx.repository.ClassTestRepository;
-import com.ustc.learnx.repository.ScheduleItemRepository;
-import lombok.AllArgsConstructor;
+import com.ustc.learnx.dto.ScheduleDtos.AuditLogResponse;
+import com.ustc.learnx.dto.ScheduleDtos.ClassTestRequest;
+import com.ustc.learnx.dto.ScheduleDtos.ClassTestResponse;
+import com.ustc.learnx.dto.ScheduleDtos.RoutineItemRequest;
+import com.ustc.learnx.dto.ScheduleDtos.RoutineItemResponse;
+import com.ustc.learnx.service.ScheduleService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.security.Principal;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * The weekly routine, class tests, and the audit trail of changes to them.
+ * Which class a change may touch is decided by {@link ScheduleService}.
+ */
 @RestController
 @RequestMapping("/api/schedule")
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class ScheduleController {
 
-    private final ScheduleItemRepository scheduleItemRepository;
-    private final ClassTestRepository classTestRepository;
-    private final AuditLogRepository auditLogRepository;
-    private final com.ustc.learnx.repository.UserRepository userRepository;
-    private final com.ustc.learnx.repository.StudentClassRepository studentClassRepository;
-
-    // --- Routine endpoints ---
+    private final ScheduleService scheduleService;
 
     @GetMapping("/routine")
-    public ResponseEntity<List<ScheduleItem>> getFullRoutine(
-            @RequestParam(required = false) Long classId,
-            Principal principal) {
-        if (principal != null) {
-            com.ustc.learnx.entity.User user = userRepository.findByUsername(principal.getName()).orElse(null);
-            if (user != null) {
-                if (classId != null) {
-                    com.ustc.learnx.entity.StudentClass sc = studentClassRepository.findById(classId).orElse(null);
-                    if (sc != null) {
-                        if (user.getUniversity() != null && sc.getUniversity() != null &&
-                            !sc.getUniversity().getId().equals(user.getUniversity().getId())) {
-                            return ResponseEntity.status(403).body(List.of());
-                        }
-                        return ResponseEntity.ok(scheduleItemRepository.findByStudentClass(sc));
-                    }
-                }
-                
-                if (user.getRole() == com.ustc.learnx.entity.User.Role.STUDENT || user.getRole() == com.ustc.learnx.entity.User.Role.CR) {
-                    if (user.getStudentClass() != null) {
-                        return ResponseEntity.ok(scheduleItemRepository.findByStudentClass(user.getStudentClass()));
-                    }
-                    return ResponseEntity.ok(List.of());
-                } else {
-                    if (user.getUniversity() != null) {
-                        return ResponseEntity.ok(scheduleItemRepository.findByUniversity(user.getUniversity()));
-                    }
-                }
-            }
-        }
-        return ResponseEntity.ok(scheduleItemRepository.findAll());
+    public ResponseEntity<List<RoutineItemResponse>> getFullRoutine(
+            @RequestParam(required = false) Long classId) {
+        return ResponseEntity.ok(scheduleService.listRoutine(classId));
     }
 
     @PreAuthorize("hasRole('CR')")
     @PostMapping("/routine")
-    public ResponseEntity<?> addRoutineItem(@RequestBody ScheduleItem item, Principal principal) {
-        if (principal == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-        }
-        com.ustc.learnx.entity.User user = userRepository.findByUsername(principal.getName()).orElse(null);
-        if (user == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "User not found"));
-        }
-        if (user.getRole() != com.ustc.learnx.entity.User.Role.CR && 
-            user.getRole() != com.ustc.learnx.entity.User.Role.TEACHER && 
-            user.getRole() != com.ustc.learnx.entity.User.Role.ADMIN) {
-            return ResponseEntity.status(403).body(Map.of("error", "Forbidden: Insufficient privileges"));
-        }
-
-        if (user.getRole() == com.ustc.learnx.entity.User.Role.CR) {
-            if (user.getStudentClass() == null) {
-                return ResponseEntity.status(400).body(Map.of("error", "Bad Request: CR does not belong to a class"));
-            }
-            item.setStudentClass(user.getStudentClass());
-        }
-        if (user.getUniversity() != null) {
-            item.setUniversity(user.getUniversity());
-        }
-
-        ScheduleItem saved = scheduleItemRepository.save(item);
-        
-        // Track Audit Log
-        String details = String.format("Added Routine Class: Course '%s', Day '%s', Time %s-%s, Room '%s', Teacher '%s'",
-                item.getCourseName(), item.getDayOfWeek(), item.getStartTime(), item.getEndTime(), item.getRoomNo(), item.getTeacherName());
-        auditLogRepository.save(AuditLog.builder()
-                .entityType("ROUTINE")
-                .entityId(saved.getId())
-                .action("CREATE")
-                .changedBy(principal.getName())
-                .timestamp(LocalDateTime.now())
-                .details(details)
-                .build());
-
-        return ResponseEntity.ok(saved);
+    public ResponseEntity<RoutineItemResponse> addRoutineItem(
+            @Valid @RequestBody RoutineItemRequest request) {
+        return ResponseEntity.ok(scheduleService.createRoutineItem(request));
     }
 
     @PreAuthorize("hasRole('CR')")
     @PutMapping("/routine/{id}")
-    public ResponseEntity<?> updateRoutineItem(@PathVariable Long id, @RequestBody ScheduleItem updated, Principal principal) {
-        if (principal == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-        }
-        com.ustc.learnx.entity.User user = userRepository.findByUsername(principal.getName()).orElse(null);
-        if (user == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "User not found"));
-        }
-        if (user.getRole() != com.ustc.learnx.entity.User.Role.CR && 
-            user.getRole() != com.ustc.learnx.entity.User.Role.TEACHER && 
-            user.getRole() != com.ustc.learnx.entity.User.Role.ADMIN) {
-            return ResponseEntity.status(403).body(Map.of("error", "Forbidden: Insufficient privileges"));
-        }
-
-        ScheduleItem existing = scheduleItemRepository.findById(id).orElse(null);
-        if (existing == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        if (user.getRole() == com.ustc.learnx.entity.User.Role.CR) {
-            if (user.getStudentClass() == null || existing.getStudentClass() == null || 
-                !existing.getStudentClass().getId().equals(user.getStudentClass().getId())) {
-                return ResponseEntity.status(403).body(Map.of("error", "Forbidden: You cannot modify schedules for another class"));
-            }
-            updated.setStudentClass(user.getStudentClass());
-        }
-
-        String details = String.format("Updated Routine Class: Day changed from '%s' to '%s', Time from %s-%s to %s-%s, Course from '%s' to '%s', Room from '%s' to '%s', Teacher '%s' to '%s'",
-                existing.getDayOfWeek(), updated.getDayOfWeek(), existing.getStartTime(), existing.getEndTime(), updated.getStartTime(), updated.getEndTime(),
-                existing.getCourseName(), updated.getCourseName(), existing.getRoomNo(), updated.getRoomNo(), existing.getTeacherName(), updated.getTeacherName());
-
-        existing.setDayOfWeek(updated.getDayOfWeek());
-        existing.setStartTime(updated.getStartTime());
-        existing.setEndTime(updated.getEndTime());
-        existing.setCourseName(updated.getCourseName());
-        existing.setRoomNo(updated.getRoomNo());
-        existing.setTeacherName(updated.getTeacherName());
-        if (updated.getStudentClass() != null) {
-            existing.setStudentClass(updated.getStudentClass());
-        }
-        if (user.getUniversity() != null) {
-            existing.setUniversity(user.getUniversity());
-        }
-
-        ScheduleItem saved = scheduleItemRepository.save(existing);
-
-        auditLogRepository.save(AuditLog.builder()
-                .entityType("ROUTINE")
-                .entityId(id)
-                .action("UPDATE")
-                .changedBy(principal.getName())
-                .timestamp(LocalDateTime.now())
-                .details(details)
-                .build());
-
-        return ResponseEntity.ok(saved);
+    public ResponseEntity<RoutineItemResponse> updateRoutineItem(
+            @PathVariable Long id, @Valid @RequestBody RoutineItemRequest request) {
+        return ResponseEntity.ok(scheduleService.updateRoutineItem(id, request));
     }
 
     @PreAuthorize("hasRole('CR')")
     @DeleteMapping("/routine/{id}")
-    public ResponseEntity<?> deleteRoutineItem(@PathVariable Long id, Principal principal) {
-        if (principal == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-        }
-        com.ustc.learnx.entity.User user = userRepository.findByUsername(principal.getName()).orElse(null);
-        if (user == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "User not found"));
-        }
-        if (user.getRole() != com.ustc.learnx.entity.User.Role.CR && 
-            user.getRole() != com.ustc.learnx.entity.User.Role.TEACHER && 
-            user.getRole() != com.ustc.learnx.entity.User.Role.ADMIN) {
-            return ResponseEntity.status(403).body(Map.of("error", "Forbidden: Insufficient privileges"));
-        }
-
-        ScheduleItem existing = scheduleItemRepository.findById(id).orElse(null);
-        if (existing == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        if (user.getRole() == com.ustc.learnx.entity.User.Role.CR) {
-            if (user.getStudentClass() == null || existing.getStudentClass() == null || 
-                !existing.getStudentClass().getId().equals(user.getStudentClass().getId())) {
-                return ResponseEntity.status(403).body(Map.of("error", "Forbidden: You cannot delete schedules for another class"));
-            }
-        }
-
-        String details = String.format("Deleted Routine Class: Course '%s', Day '%s', Time %s-%s, Room '%s', Teacher '%s'",
-                existing.getCourseName(), existing.getDayOfWeek(), existing.getStartTime(), existing.getEndTime(), existing.getRoomNo(), existing.getTeacherName());
-
-        scheduleItemRepository.deleteById(id);
-
-        auditLogRepository.save(AuditLog.builder()
-                .entityType("ROUTINE")
-                .entityId(id)
-                .action("DELETE")
-                .changedBy(principal.getName())
-                .timestamp(LocalDateTime.now())
-                .details(details)
-                .build());
-
+    public ResponseEntity<?> deleteRoutineItem(@PathVariable Long id) {
+        scheduleService.deleteRoutineItem(id);
         return ResponseEntity.ok(Map.of("message", "Routine class deleted"));
     }
 
-    // --- Class Test (CT) endpoints ---
-
     @GetMapping("/ct")
-    public ResponseEntity<List<ClassTest>> getUpcomingCTs(
-            @RequestParam(required = false) Long classId,
-            Principal principal) {
-        if (principal != null) {
-            com.ustc.learnx.entity.User user = userRepository.findByUsername(principal.getName()).orElse(null);
-            if (user != null) {
-                if (classId != null) {
-                    com.ustc.learnx.entity.StudentClass sc = studentClassRepository.findById(classId).orElse(null);
-                    if (sc != null) {
-                        if (user.getUniversity() != null && sc.getUniversity() != null &&
-                            !sc.getUniversity().getId().equals(user.getUniversity().getId())) {
-                            return ResponseEntity.status(403).body(List.of());
-                        }
-                        return ResponseEntity.ok(classTestRepository.findByStudentClassOrderByDateTimeAsc(sc));
-                    }
-                }
-                
-                if (user.getRole() == com.ustc.learnx.entity.User.Role.STUDENT || user.getRole() == com.ustc.learnx.entity.User.Role.CR) {
-                    if (user.getStudentClass() != null) {
-                        return ResponseEntity.ok(classTestRepository.findByStudentClassOrderByDateTimeAsc(user.getStudentClass()));
-                    }
-                    return ResponseEntity.ok(List.of());
-                }
-            }
-        }
-        return ResponseEntity.ok(classTestRepository.findAllByOrderByDateTimeAsc());
+    public ResponseEntity<List<ClassTestResponse>> getUpcomingCTs(
+            @RequestParam(required = false) Long classId) {
+        return ResponseEntity.ok(scheduleService.listClassTests(classId));
     }
 
     @PreAuthorize("hasRole('CR')")
     @PostMapping("/ct")
-    public ResponseEntity<?> addClassTest(@RequestBody ClassTest ct, Principal principal) {
-        if (principal == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-        }
-        com.ustc.learnx.entity.User user = userRepository.findByUsername(principal.getName()).orElse(null);
-        if (user == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "User not found"));
-        }
-
-        if (ct.getStudentClass() == null) {
-            if (user.getRole() == com.ustc.learnx.entity.User.Role.CR || user.getRole() == com.ustc.learnx.entity.User.Role.STUDENT) {
-                ct.setStudentClass(user.getStudentClass());
-            }
-        }
-        if (ct.getUniversity() == null) {
-            ct.setUniversity(user.getUniversity());
-        }
-
-        ct.setCreatedBy(principal.getName());
-        ClassTest saved = classTestRepository.save(ct);
-
-        String details = String.format("Scheduled Class Test (CT): Course '%s', Date/Time '%s', Duration %d mins, Room '%s', Topic '%s'",
-                ct.getCourseName(), ct.getDateTime(), ct.getDurationMinutes(), ct.getRoomNo(), ct.getTopic());
-
-        auditLogRepository.save(AuditLog.builder()
-                .entityType("CLASS_TEST")
-                .entityId(saved.getId())
-                .action("CREATE")
-                .changedBy(principal.getName())
-                .timestamp(LocalDateTime.now())
-                .details(details)
-                .build());
-
-        return ResponseEntity.ok(saved);
+    public ResponseEntity<ClassTestResponse> addClassTest(
+            @Valid @RequestBody ClassTestRequest request) {
+        return ResponseEntity.ok(scheduleService.createClassTest(request));
     }
 
     @PreAuthorize("hasRole('CR')")
     @PutMapping("/ct/{id}")
-    public ResponseEntity<?> updateClassTest(@PathVariable Long id, @RequestBody ClassTest updated, Principal principal) {
-        ClassTest existing = classTestRepository.findById(id).orElse(null);
-        if (existing == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        String details = String.format("Updated Class Test (CT): Course changed from '%s' to '%s', Date/Time from '%s' to '%s', Room from '%s' to '%s', Topic from '%s' to '%s'",
-                existing.getCourseName(), updated.getCourseName(), existing.getDateTime(), updated.getDateTime(), 
-                existing.getRoomNo(), updated.getRoomNo(), existing.getTopic(), updated.getTopic());
-
-        existing.setCourseName(updated.getCourseName());
-        existing.setDateTime(updated.getDateTime());
-        existing.setDurationMinutes(updated.getDurationMinutes());
-        existing.setRoomNo(updated.getRoomNo());
-        existing.setTopic(updated.getTopic());
-
-        ClassTest saved = classTestRepository.save(existing);
-
-        auditLogRepository.save(AuditLog.builder()
-                .entityType("CLASS_TEST")
-                .entityId(id)
-                .action("UPDATE")
-                .changedBy(principal.getName())
-                .timestamp(LocalDateTime.now())
-                .details(details)
-                .build());
-
-        return ResponseEntity.ok(saved);
+    public ResponseEntity<ClassTestResponse> updateClassTest(
+            @PathVariable Long id, @Valid @RequestBody ClassTestRequest request) {
+        return ResponseEntity.ok(scheduleService.updateClassTest(id, request));
     }
 
     @PreAuthorize("hasRole('CR')")
     @DeleteMapping("/ct/{id}")
-    public ResponseEntity<?> deleteClassTest(@PathVariable Long id, Principal principal) {
-        ClassTest existing = classTestRepository.findById(id).orElse(null);
-        if (existing == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        String details = String.format("Cancelled/Deleted Class Test (CT): Course '%s', Date/Time '%s', Room '%s', Topic '%s'",
-                existing.getCourseName(), existing.getDateTime(), existing.getRoomNo(), existing.getTopic());
-
-        classTestRepository.deleteById(id);
-
-        auditLogRepository.save(AuditLog.builder()
-                .entityType("CLASS_TEST")
-                .entityId(id)
-                .action("DELETE")
-                .changedBy(principal.getName())
-                .timestamp(LocalDateTime.now())
-                .details(details)
-                .build());
-
+    public ResponseEntity<?> deleteClassTest(@PathVariable Long id) {
+        scheduleService.deleteClassTest(id);
         return ResponseEntity.ok(Map.of("message", "Class test deleted"));
     }
 
-    // --- Audit Logs endpoints ---
-
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/audit-logs")
-    public ResponseEntity<List<AuditLog>> getAuditLogs() {
-        return ResponseEntity.ok(auditLogRepository.findAllByOrderByTimestampDesc());
+    public ResponseEntity<List<AuditLogResponse>> getAuditLogs() {
+        return ResponseEntity.ok(scheduleService.listAuditLogs());
     }
 }

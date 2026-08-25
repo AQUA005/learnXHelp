@@ -11,6 +11,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import java.util.List;
+
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -37,6 +39,52 @@ class AuthorizationMatrixTest {
 
     @Autowired
     private MockMvc mvc;
+
+    @Autowired
+    private com.ustc.learnx.repository.UserRepository userRepository;
+
+    @Autowired
+    private com.ustc.learnx.repository.UniversityRepository universityRepository;
+
+    @Autowired
+    private com.ustc.learnx.repository.StudentClassRepository studentClassRepository;
+
+    /**
+     * Gives each impersonated principal a real account.
+     *
+     * <p>A mock principal alone is not enough: the services resolve the caller
+     * from the database, so without a row every request would be refused for
+     * lack of an account rather than by the rule under test.
+     */
+    @org.junit.jupiter.api.BeforeEach
+    void seedAccounts() {
+        if (userRepository.findByUsername("teacher").isPresent()) {
+            return;
+        }
+        var university = universityRepository.findAll().stream().findFirst().orElseThrow();
+        var studentClass = studentClassRepository.save(com.ustc.learnx.entity.StudentClass.builder()
+                .batch("Batch 21").department("CSE").section("Section A")
+                .university(university).build());
+
+        record Account(String username, com.ustc.learnx.entity.User.Role role, boolean inClass) {
+        }
+        for (Account account : List.of(
+                new Account("student", com.ustc.learnx.entity.User.Role.STUDENT, true),
+                new Account("cr", com.ustc.learnx.entity.User.Role.CR, true),
+                new Account("teacher", com.ustc.learnx.entity.User.Role.TEACHER, false),
+                new Account("admin", com.ustc.learnx.entity.User.Role.ADMIN, false))) {
+            userRepository.save(com.ustc.learnx.entity.User.builder()
+                    .username(account.username())
+                    .password("irrelevant")
+                    .fullName(account.username())
+                    .email(account.username() + "@ustc.test")
+                    .role(account.role())
+                    .approved(true)
+                    .studentClass(account.inClass() ? studentClass : null)
+                    .university(university)
+                    .build());
+        }
+    }
 
     // -----------------------------------------------------------------
     // Anonymous callers
@@ -221,7 +269,8 @@ class AuthorizationMatrixTest {
             "classHighest":0,"percentile":0,"alreadySubmitted":false,\
             "title":"t","content":"c","courseName":"c","type":"DEPARTMENT","value":"v",\
             "dayOfWeek":"MONDAY","startTime":"10:00:00","endTime":"11:00:00",\
-            "dateTime":"2026-09-01T10:00:00"}""";
+            "dateTime":"2026-09-01T10:00:00","studentUsername":"student",\
+            "assessmentName":"CT 1"}""";
 
     /**
      * Exams carry their times as ISO date-time strings, where a schedule item
