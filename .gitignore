@@ -56,3 +56,5 @@ frontend/dist/
 ### Frontend toolchain downloaded by the Maven build ###
 frontend/node
 frontend/*.tsbuildinfo
+frontend/playwright-report/
+frontend/test-results/

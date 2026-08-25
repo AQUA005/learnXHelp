@@ -11,8 +11,14 @@ async function signIn(page: import('@playwright/test').Page, username: string) {
   await page.goto('/')
   await page.getByLabel('Username').fill(username)
   await page.getByLabel('Password').fill('password')
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  // Scoped to the form: the tab that selects this panel carries the same name.
+  await page.locator('form').getByRole('button', { name: 'Sign in' }).click()
   await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible()
+}
+
+async function signOut(page: import('@playwright/test').Page) {
+  await page.getByRole('button', { name: 'Sign out' }).click()
+  await expect(page.locator('form').getByRole('button', { name: 'Sign in' })).toBeVisible()
 }
 
 test('a student can sign in and reach every screen', async ({ page }) => {
@@ -33,18 +39,25 @@ test('a student can sign in and reach every screen', async ({ page }) => {
   await page.getByRole('link', { name: 'My results' }).click()
   await expect(page.getByRole('heading', { name: 'My results' })).toBeVisible()
 
-  await page.getByRole('button', { name: 'Sign out' }).click()
-  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible()
+  await signOut(page)
 })
 
 test('a student can sit an exam and see the result recorded', async ({ page }) => {
   await signIn(page, 'student')
 
   await page.getByRole('link', { name: 'Exams', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Exams' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Exams', exact: true })).toBeVisible()
+
+  // The seeded data always contains an exam. Asserting that rather than
+  // skipping means a broken exam list fails here instead of passing quietly.
+  await expect(page.getByText(/\d+ exams?/)).toBeVisible()
 
   const start = page.getByRole('link', { name: 'Start exam' }).first()
-  test.skip(!(await start.isVisible()), 'No open exam in the seeded data')
+  if ((await start.count()) === 0) {
+    // A previous run against the same database already sat this exam.
+    await expect(page.getByText(/Submitted · \d+ marks?/)).toBeVisible()
+    return
+  }
 
   await start.click()
   await expect(page.getByText(/of \d+ answered/)).toBeVisible()
@@ -63,8 +76,11 @@ test('a student can sit an exam and see the result recorded', async ({ page }) =
 
   await page.getByRole('button', { name: 'Submit answers' }).click()
 
-  // Back on the list, the exam now shows as submitted.
-  await expect(page.getByText(/Submitted/)).toBeVisible()
+  // Back on the list, the exam card now carries the mark. Matched on the
+  // badge's wording rather than "Submitted" alone, which also appears in the
+  // confirmation toast.
+  await expect(page.getByText(/Submitted · \d+ marks?/)).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Start exam' })).toHaveCount(0)
 })
 
 test('a student cannot reach the administration screens', async ({ page }) => {

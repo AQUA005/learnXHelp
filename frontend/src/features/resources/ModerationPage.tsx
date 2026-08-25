@@ -42,7 +42,7 @@ export default function ModerationPage() {
         description="Material submitted by students, waiting to be published."
       />
 
-      <Card title={`${items.length} awaiting review`}>
+      <Card title={pending.isLoading ? 'Awaiting review' : `${items.length} awaiting review`}>
         {pending.isLoading ? (
           <Loading rows={3} />
         ) : items.length === 0 ? (

@@ -32,7 +32,7 @@ export default function GradebookPage() {
       <RecordGradeForm />
 
       <Card
-        title={`${visible.length} record${visible.length === 1 ? '' : 's'}`}
+        title={grades.isLoading ? 'Recorded marks' : `${visible.length} record${visible.length === 1 ? '' : 's'}`}
         actions={
           <input
             placeholder="Search"

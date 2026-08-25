@@ -45,7 +45,7 @@ export default function NotesPage() {
       <UploadForm />
 
       <Card
-        title={`${visible.length} item${visible.length === 1 ? '' : 's'}`}
+        title={notes.isLoading ? 'Shared notes' : `${visible.length} item${visible.length === 1 ? '' : 's'}`}
         actions={
           <div className="row">
             <input

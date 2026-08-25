@@ -73,7 +73,7 @@ function Approvals() {
   const items = pending.data ?? []
 
   return (
-    <Card title={`${items.length} awaiting approval`}>
+    <Card title={pending.isLoading ? 'Awaiting approval' : `${items.length} awaiting approval`}>
       {pending.isLoading ? (
         <Loading rows={3} />
       ) : items.length === 0 ? (
@@ -168,7 +168,7 @@ function Classes() {
   const items = classes.data ?? []
 
   return (
-    <Card title={`${items.length} class group${items.length === 1 ? '' : 's'}`}>
+    <Card title={classes.isLoading ? 'Class groups' : `${items.length} class group${items.length === 1 ? '' : 's'}`}>
       {classes.isLoading ? (
         <Loading rows={3} />
       ) : items.length === 0 ? (
