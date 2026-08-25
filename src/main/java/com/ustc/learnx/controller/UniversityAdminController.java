@@ -3,6 +3,7 @@ package com.ustc.learnx.controller;
 import com.ustc.learnx.entity.*;
 import com.ustc.learnx.entity.User.Role;
 import com.ustc.learnx.repository.*;
+import com.ustc.learnx.service.PromotionService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AllArgsConstructor;
@@ -48,6 +49,7 @@ public class UniversityAdminController {
     private final ResourceRepository resourceRepository;
     private final ResourceReactionRepository resourceReactionRepository;
     private final com.ustc.learnx.service.CurrentUserService currentUserService;
+    private final com.ustc.learnx.service.PromotionService promotionService;
 
     @Data
     @NoArgsConstructor
@@ -391,157 +393,25 @@ public class UniversityAdminController {
     }
 
     // --- Semester Promotion & Rollback ---
-
-    private String getNextSemester(String current) {
-        List<String> semesters = List.of(
-                "1st Year 1st Semester", "1st Year 2nd Semester",
-                "2nd Year 1st Semester", "2nd Year 2nd Semester",
-                "3rd Year 1st Semester", "3rd Year 2nd Semester",
-                "4th Year 1st Semester", "4th Year 2nd Semester"
-        );
-        int idx = semesters.indexOf(current);
-        if (idx == -1) return "1st Year 1st Semester";
-        if (idx == semesters.size() - 1) return current; // already at max
-        return semesters.get(idx + 1);
-    }
-
-    private String getPreviousSemester(String current) {
-        List<String> semesters = List.of(
-                "1st Year 1st Semester", "1st Year 2nd Semester",
-                "2nd Year 1st Semester", "2nd Year 2nd Semester",
-                "3rd Year 1st Semester", "3rd Year 2nd Semester",
-                "4th Year 1st Semester", "4th Year 2nd Semester"
-        );
-        int idx = semesters.indexOf(current);
-        if (idx <= 0) return "1st Year 1st Semester";
-        return semesters.get(idx - 1);
-    }
-
     @PostMapping("/classes/{classId}/promote")
-    @Transactional
     public ResponseEntity<?> promoteClass(@PathVariable Long classId) {
-        Optional<StudentClass> classOpt = studentClassRepository.findById(classId);
-        if (classOpt.isEmpty()) return ResponseEntity.notFound().build();
-
-        StudentClass sc = classOpt.get();
-        List<User> students = userRepository.findByStudentClass(sc);
-        if (students.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "No students enrolled in this class group"));
-        }
-
-        // Get current semester of class from any student
-        String currentSemester = "1st Year 1st Semester";
-        for (User s : students) {
-            if (s.getSemester() != null) {
-                currentSemester = s.getSemester();
-                break;
-            }
-        }
-
-        String nextSemester = getNextSemester(currentSemester);
-        if (nextSemester.equals(currentSemester)) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Class is already in the final semester"));
-        }
-
-        // 1. Create assignments snapshot
-        List<ClassCourseAssignment> ccaList = classCourseAssignmentRepository.findByStudentClass(sc);
-        List<AssignmentSnapshot> snapshots = ccaList.stream().map(cca -> new AssignmentSnapshot(
-                cca.getCourse().getId(),
-                cca.getCourse().getCode(),
-                cca.getCourse().getName(),
-                cca.getTeacher().getId(),
-                cca.getTeacher().getUsername(),
-                cca.getTeacher().getFullName()
-        )).collect(Collectors.toList());
-
-        String jsonStr = "";
-        try {
-            jsonStr = objectMapper.writeValueAsString(snapshots);
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to compile assignment snapshot"));
-        }
-
-        // 2. Save promotion log
-        PromotionHistory history = PromotionHistory.builder()
-                .studentClass(sc)
-                .fromSemester(currentSemester)
-                .toSemester(nextSemester)
-                .timestamp(LocalDateTime.now())
-                .savedAssignmentsJson(jsonStr)
-                .build();
-        promotionHistoryRepository.save(history);
-
-        // 3. Update all student semesters
-        for (User s : students) {
-            s.setSemester(nextSemester);
-            userRepository.save(s);
-        }
-
-        // 4. Wipe active course/teacher assignments (so they register new ones for next semester)
-        classCourseAssignmentRepository.deleteByStudentClass(sc);
-
+        PromotionService.PromotionResult result = promotionService.promote(classId);
         return ResponseEntity.ok(Map.of(
-                "message", "Class promoted to " + nextSemester + " successfully!",
-                "fromSemester", currentSemester,
-                "toSemester", nextSemester
-        ));
+                "message", "Class promoted to " + result.toSemester() + " successfully!",
+                "fromSemester", result.fromSemester(),
+                "toSemester", result.toSemester(),
+                "studentsMoved", result.studentsMoved()));
     }
 
     @PostMapping("/classes/{classId}/rollback-promotion")
-    @Transactional
     public ResponseEntity<?> rollbackPromotion(@PathVariable Long classId) {
-        Optional<StudentClass> classOpt = studentClassRepository.findById(classId);
-        if (classOpt.isEmpty()) return ResponseEntity.notFound().build();
-
-        StudentClass sc = classOpt.get();
-        List<PromotionHistory> historyList = promotionHistoryRepository.findByStudentClassOrderByTimestampDesc(sc);
-        if (historyList.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "No promotion history log found for this class group"));
-        }
-
-        PromotionHistory latestLog = historyList.get(0);
-
-        // 1. Restore student semesters
-        List<User> students = userRepository.findByStudentClass(sc);
-        for (User s : students) {
-            s.setSemester(latestLog.getFromSemester());
-            userRepository.save(s);
-        }
-
-        // 2. Clear current assignments
-        classCourseAssignmentRepository.deleteByStudentClass(sc);
-
-        // 3. Restore assignments from JSON snapshot
-        try {
-            List<AssignmentSnapshot> snapshots = objectMapper.readValue(
-                    latestLog.getSavedAssignmentsJson(),
-                    new TypeReference<List<AssignmentSnapshot>>() {}
-            );
-
-            for (AssignmentSnapshot snap : snapshots) {
-                Optional<Course> courseOpt = courseRepository.findById(snap.getCourseId());
-                Optional<User> teacherOpt = userRepository.findById(snap.getTeacherId());
-                if (courseOpt.isPresent() && teacherOpt.isPresent()) {
-                    ClassCourseAssignment cca = ClassCourseAssignment.builder()
-                            .studentClass(sc)
-                            .course(courseOpt.get())
-                            .teacher(teacherOpt.get())
-                            .build();
-                    classCourseAssignmentRepository.save(cca);
-                }
-            }
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to unpack rollback snapshot metadata: " + e.getMessage()));
-        }
-
-        // 4. Delete the rollback log entry so they don't double undo it
-        promotionHistoryRepository.delete(latestLog);
-
+        PromotionService.PromotionResult result = promotionService.rollback(classId);
         return ResponseEntity.ok(Map.of(
-                "message", "Successfully rolled back promotion to " + latestLog.getFromSemester() + "!",
-                "restoredSemester", latestLog.getFromSemester()
-        ));
+                "message", "Successfully rolled back promotion to " + result.toSemester() + "!",
+                "restoredSemester", result.toSemester(),
+                "studentsMoved", result.studentsMoved()));
     }
+
 
     @GetMapping("/students")
     public ResponseEntity<?> getStudents(@RequestHeader(value = "X-University-Domain", required = false) String domainHeader,
