@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 
 import java.util.List;
 
@@ -19,9 +20,16 @@ import static org.assertj.core.api.Assertions.assertThat;
  * script, and Hibernate runs with {@code ddl-auto=validate}, so a mismatch
  * between an entity and the schema fails before any test body runs. These cases
  * cover the parts validation cannot see — seed data, indexes and constraints.
+ *
+ * <p>These are assertions about a <em>freshly migrated</em> database, so this
+ * class takes one of its own rather than the database the rest of the suite
+ * shares. Sharing made the outcome depend on execution order: a test class that
+ * seeds accounts, running first, made "the migrations create no accounts" fail.
  */
 @SpringBootTest
 @ActiveProfiles("test")
+@TestPropertySource(properties =
+        "spring.datasource.url=jdbc:h2:mem:learnx-migrations;DB_CLOSE_DELAY=-1;MODE=PostgreSQL")
 class MigrationSchemaTest {
 
     @Autowired
