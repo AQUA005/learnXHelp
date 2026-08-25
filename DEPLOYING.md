@@ -7,16 +7,17 @@ Read the two warnings first — they decide what you need to pay for.
 
 ## Before you start: two things that will bite you
 
-### 1. The free database is temporary
+### 1. Render's own free database is temporary
 
 Render's free PostgreSQL plan is removed after a trial period. When it goes, so
 does everything in it: every account, grade, routine and announcement.
 
-- **Trying things out?** Free is fine.
-- **Real students relying on it?** Pay for the smallest paid database plan.
+That is the single most important thing to get right, and it is why the next
+section exists. **If you want a free database that does not expire, do not use
+Render's** — host the database elsewhere and point Render at it. Everything
+needed for that is already built in.
 
-You can start on free and upgrade, but **upgrading is not automatic** — take a
-backup first (see [Backups](#backups)).
+See [Choosing a database](#choosing-a-database).
 
 ### 2. Uploaded files need a disk
 
@@ -39,21 +40,89 @@ and are unaffected — only uploaded files are at risk.
 
 ---
 
-## Step 1 — Get this code onto `main`
+## Step 1 — The code is already on `main`
 
-Your Render service deploys from a branch, almost certainly `main`. This work is
-on a branch and needs merging first.
+This is done: the work was merged in
+<https://github.com/AQUA005/learnXHelp/pull/1>, so Render is deploying from it
+already.
 
-1. Open the pull request: <https://github.com/AQUA005/learnXHelp/pull/1>
-2. Read through it if you like, then click **Merge pull request**, then
-   **Confirm merge**.
-
-If Render is already watching `main`, merging starts a deploy immediately. That
-deploy **will fail** until you finish step 3, which is expected and harmless.
+That first deploy comes up but **cannot be signed into**, because the settings in
+step 3 are not there yet: no database of your own, and no administrator account.
+That is expected, not a fault. Steps 2 to 5 fix it.
 
 ---
 
-## Step 2 — Create the database
+## Choosing a database
+
+The application needs PostgreSQL. It does not care who runs it — it reads a
+single `DATABASE_URL` and works out the rest, so any of these is a matter of
+pasting one line into Render.
+
+**Prices and free-tier terms change.** Check the current terms on the provider's
+own pricing page before committing; what follows is about the shape of each
+option, not its price this week.
+
+| Option | Free tier | The catch |
+|---|---|---|
+| **Neon** | Yes, and it does not expire | Pauses when idle, so the first request after a quiet spell is slow |
+| **Supabase** | Yes | Free projects pause after a period of inactivity and need restoring from the dashboard |
+| **Aiven** | Yes, a small plan | Smaller allowance than the others |
+| **Render** | Yes, but removed after a trial period | Simplest to set up, and the fastest, because it sits beside the application |
+
+### The recommendation
+
+**Use Neon for a free database you intend to keep.** It is real PostgreSQL, the
+free tier is not time-limited, and this application is small — it stores text,
+while uploaded files go to disk, so it will not come close to the storage
+allowance.
+
+**Use Render's own database if you are paying**, because a database in the same
+region as the application is faster than one across the internet, and there is
+one less account to manage.
+
+### What "pauses when idle" means
+
+A serverless database shuts down when nothing is using it and wakes on the next
+query. In practice a student opening the site after a quiet night waits a second
+or two longer, once. The connection pool is configured for this, so it waits
+rather than failing.
+
+If you are also on Render's free plan, the *application* sleeps too, and that
+delay is the larger of the two.
+
+### Using Neon
+
+1. Sign up at <https://neon.tech> and create a project
+2. **Pick the region closest to your Render region** — every query crosses the
+   internet, so this is worth a moment's thought
+3. Copy the connection string it gives you. It looks like:
+
+   ```
+   postgresql://learnx_owner:npg_xxxx@ep-cool-morning-a1b2c3-pooler.eu-central-1.aws.neon.tech/learnx?sslmode=require
+   ```
+
+4. In Render, set that as `DATABASE_URL` on the web service
+
+That is the whole integration. Prefer the **pooled** connection string if Neon
+offers you a choice — the host contains `-pooler`. Keep `?sslmode=require`
+exactly as given; it is what encrypts the connection, and it is carried through
+untouched.
+
+Then continue from [Step 3](#step-3--point-the-application-at-the-database) and
+skip step 2, since you already have a database.
+
+### If you outgrow the free tier
+
+Nothing in the application changes. Create the new database, take a backup of
+the old one (see [Backups](#backups)), restore it, and update `DATABASE_URL`.
+The migrations run against whatever they find.
+
+---
+
+## Step 2 — Create the database (Render's own)
+
+Skip this if you followed [Using Neon](#using-neon) or another provider — you
+have a database already. Go straight to step 3.
 
 1. Go to <https://dashboard.render.com>
 2. **New +** > **Postgres**
@@ -81,18 +150,23 @@ Add these. **Add** > type the key > paste the value > **Save Changes**.
 | Key | Value |
 |---|---|
 | `SPRING_PROFILES_ACTIVE` | `prod` |
-| `DATABASE_URL` | The **Internal Database URL** from your database page |
+| `DATABASE_URL` | Your database connection string — see below |
 | `LEARNX_STORAGE_ROOT` | `/var/lib/learnx/files` |
 | `LEARNX_ADMIN_USERNAME` | A username for yourself, for example `principal` |
 | `LEARNX_ADMIN_PASSWORD` | A strong password — at least 8 characters with a letter and a number |
 | `LEARNX_ADMIN_EMAIL` | Your email address |
 
-**About `DATABASE_URL`:** on your database page, copy **Internal Database URL**,
-not External. Internal is faster and does not leave Render's network. It looks
-like:
+**About `DATABASE_URL`:**
+
+- **Using Render's database?** Copy the **Internal Database URL**, not the
+  External one. Internal is faster and never leaves Render's network.
+- **Using Neon, Supabase or Aiven?** Copy the connection string they gave you,
+  including everything after the `?`.
+
+Either way it looks something like:
 
 ```
-postgresql://learnx:LONGRANDOMPASSWORD@dpg-xxxxx-a/learnx
+postgresql://learnx:LONGRANDOMPASSWORD@some-host-name/learnx?sslmode=require
 ```
 
 Paste it exactly. It is not a JDBC URL and does not look like one — the
@@ -198,6 +272,9 @@ Open **Logs** on the web service and look for the first line containing `ERROR`.
 |---|---|---|
 | `The connection attempt failed` / `UnknownHost` | Cannot reach the database | Check `DATABASE_URL`. Use the **Internal** URL, and put the database in the same region as the service |
 | `password authentication failed` | Wrong credentials | Re-copy the Internal Database URL; it changes if you recreate the database |
+| `SSL connection is required` or `no pg_hba.conf entry` | The provider requires TLS | Keep `?sslmode=require` on the end of `DATABASE_URL`; do not trim it |
+| First request after a quiet period is slow, then fine | A serverless database waking up | Normal on a free tier. Nothing to fix |
+| `too many clients already` | The pool is larger than the free tier allows | Set `DB_POOL_SIZE` to `3` and redeploy |
 | `No accounts exist and no bootstrap administrator is configured` | Locked out | Set `LEARNX_ADMIN_USERNAME` / `_PASSWORD` / `_EMAIL`, then deploy again |
 | `The bootstrap administrator password was rejected` | Password too weak | At least 8 characters, with a letter and a number |
 | `Schema-validation: missing table` | Migrations did not run | Check the log for a Flyway error above this line |
