@@ -2,10 +2,8 @@ package com.ustc.learnx.controller;
 
 import com.ustc.learnx.entity.User;
 import com.ustc.learnx.entity.User.Role;
-import com.ustc.learnx.entity.SystemAdmin;
 import com.ustc.learnx.entity.University;
 import com.ustc.learnx.repository.UserRepository;
-import com.ustc.learnx.repository.SystemAdminRepository;
 import com.ustc.learnx.repository.UniversityRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -33,7 +31,6 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final SystemAdminRepository systemAdminRepository;
     private final UniversityRepository universityRepository;
     private final org.springframework.mail.javamail.JavaMailSender mailSender;
     private final org.springframework.core.env.Environment env;
@@ -115,21 +112,9 @@ public class AuthController {
                         user.getDesignation(),
                         user.getProfilePicUrl()
                 ));
-            } else {
-                Optional<SystemAdmin> sysAdminOpt = systemAdminRepository.findByUsername(request.getUsername());
-                if (sysAdminOpt.isPresent()) {
-                    SystemAdmin sysAdmin = sysAdminOpt.get();
-                    return ResponseEntity.ok(new UserResponse(
-                            sysAdmin.getId(),
-                            sysAdmin.getUsername(),
-                            sysAdmin.getFullName(),
-                            sysAdmin.getEmail(),
-                            "SYSTEM_ADMIN",
-                            null, null, null, null, null, null, null
-                    ));
-                }
             }
-            throw new RuntimeException("User not found in repositories");
+            // Authentication succeeded, so the account row must exist.
+            throw new IllegalStateException("Authenticated principal has no account row");
         } catch (org.springframework.security.authentication.DisabledException e) {
             return ResponseEntity.status(403)
                     .body(Map.of("error", "Your account is pending administrator approval."));
@@ -147,14 +132,17 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("error", "Email address is already registered"));
         }
 
+        // Only these roles may be self-selected. Administrator accounts are
+        // created by an existing administrator, never by signing up.
         Role userRole;
         try {
             userRole = Role.valueOf(request.getRole().toUpperCase());
-            if (userRole == Role.ADMIN) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Direct administrator registration is prohibited"));
-            }
         } catch (Exception e) {
-            userRole = Role.STUDENT; // Default to Student
+            userRole = Role.STUDENT;
+        }
+        if (userRole != Role.STUDENT && userRole != Role.CR && userRole != Role.TEACHER) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Direct administrator registration is prohibited"));
         }
 
         String policyError = com.ustc.learnx.common.PasswordPolicy.validate(request.getPassword());
@@ -252,19 +240,6 @@ public class AuthController {
                     user.getDesignation(),
                     user.getProfilePicUrl()
             ));
-        } else {
-            Optional<SystemAdmin> sysAdminOpt = systemAdminRepository.findByUsername(principal.getName());
-            if (sysAdminOpt.isPresent()) {
-                SystemAdmin sysAdmin = sysAdminOpt.get();
-                return ResponseEntity.ok(new UserResponse(
-                        sysAdmin.getId(),
-                        sysAdmin.getUsername(),
-                        sysAdmin.getFullName(),
-                        sysAdmin.getEmail(),
-                        "SYSTEM_ADMIN",
-                        null, null, null, null, null, null, null
-                ));
-            }
         }
         return ResponseEntity.status(401).body(Map.of("error", "User session invalid"));
     }

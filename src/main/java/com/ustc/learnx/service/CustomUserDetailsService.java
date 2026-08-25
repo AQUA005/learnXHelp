@@ -1,8 +1,6 @@
 package com.ustc.learnx.service;
 
-import com.ustc.learnx.entity.SystemAdmin;
 import com.ustc.learnx.entity.User;
-import com.ustc.learnx.repository.SystemAdminRepository;
 import com.ustc.learnx.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -10,28 +8,22 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
-import java.util.Optional;
-
+/**
+ * Loads accounts for authentication.
+ *
+ * <p>Every account, platform administrators included, lives in {@code users}
+ * and is distinguished by its role. There used to be a second table for
+ * platform administrators, which meant every lookup here — and in the login
+ * and profile endpoints — had to try both.
+ */
 @Service
 @RequiredArgsConstructor
 public class CustomUserDetailsService implements UserDetailsService {
 
     private final UserRepository userRepository;
-    private final SystemAdminRepository systemAdminRepository;
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        // First check if user is a system admin (site owner / master admin)
-        Optional<SystemAdmin> sysAdmin = systemAdminRepository.findByUsername(username);
-        if (sysAdmin.isPresent()) {
-            return org.springframework.security.core.userdetails.User.builder()
-                    .username(sysAdmin.get().getUsername())
-                    .password(sysAdmin.get().getPassword())
-                    .roles("SYSTEM_ADMIN")
-                    .build();
-        }
-
-        // Then check if user is a university user
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with username: " + username));
 

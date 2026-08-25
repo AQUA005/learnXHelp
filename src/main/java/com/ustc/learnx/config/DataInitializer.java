@@ -37,69 +37,45 @@ public class DataInitializer implements CommandLineRunner {
     private final SystemMetadataRepository systemMetadataRepository;
     private final StudentClassRepository studentClassRepository;
     private final UniversityRepository universityRepository;
-    private final SystemAdminRepository systemAdminRepository;
     private final AnnouncementRepository announcementRepository;
     private final ClassCourseAssignmentRepository classCourseAssignmentRepository;
     private final CourseRepository courseRepository;
 
     @Override
     public void run(String... args) throws Exception {
-        // 1. Seed Master System Admin (Site Owner)
-        if (systemAdminRepository.count() == 0) {
+        // 1. Seed the platform owner. Lives in users like every other account,
+        // distinguished only by its role, and belongs to no university.
+        if (userRepository.findByUsername("master").isEmpty()) {
             System.out.println("Seeding Master System Admin...");
-            SystemAdmin master = SystemAdmin.builder()
+            userRepository.save(User.builder()
                     .username("master")
                     .password(passwordEncoder.encode("password"))
                     .fullName("Master Admin")
                     .email("master@learnx.com")
-                    .build();
-            systemAdminRepository.save(master);
+                    .role(Role.SYSTEM_ADMIN)
+                    .approved(true)
+                    .build());
         }
 
-        // 2. Seed Default University & default Admin
-        University defaultUni = null;
-        if (universityRepository.count() == 0) {
-            System.out.println("Seeding Default University...");
-            defaultUni = University.builder()
-                    .name("LearnX")
-                    .domain("university.edu")
-                    .logoUrl("")
-                    .build();
-            defaultUni = universityRepository.save(defaultUni);
+        // 2. The university itself is created by migration V2, not here. Attach
+        // the demo accounts to it rather than creating a second one.
+        University defaultUni = universityRepository.findAll().stream().findFirst().orElse(null);
+        if (defaultUni == null) {
+            System.out.println("No university found; skipping demo seed. Did the migrations run?");
+            return;
+        }
 
-            if (userRepository.count() == 0) {
-                System.out.println("Seeding default university admin...");
-                User defaultAdmin = User.builder()
-                        .username("admin")
-                        .password(passwordEncoder.encode("password"))
-                        .fullName("Admin")
-                        .email("admin@learnx.help")
-                        .role(Role.ADMIN)
-                        .approved(true)
-                        .university(defaultUni)
-                        .build();
-                userRepository.save(defaultAdmin);
-            }
-        } else {
-            List<University> allUnis = universityRepository.findAll();
-            if (!allUnis.isEmpty()) {
-                defaultUni = allUnis.get(0);
-                if ("LearnX University".equals(defaultUni.getName())) {
-                    System.out.println("Migrating university name to LearnX...");
-                    defaultUni.setName("LearnX");
-                    defaultUni = universityRepository.save(defaultUni);
-                }
-            }
-            userRepository.findByUsername("admin").ifPresent(admin -> {
-                if ("University Admin".equals(admin.getFullName())) {
-                    System.out.println("Migrating default admin name to Admin...");
-                    admin.setFullName("Admin");
-                    if ("admin@university.edu".equals(admin.getEmail())) {
-                        admin.setEmail("admin@learnx.help");
-                    }
-                    userRepository.save(admin);
-                }
-            });
+        if (userRepository.findByUsername("admin").isEmpty()) {
+            System.out.println("Seeding default university admin...");
+            userRepository.save(User.builder()
+                    .username("admin")
+                    .password(passwordEncoder.encode("password"))
+                    .fullName("Admin")
+                    .email("admin@learnx.help")
+                    .role(Role.ADMIN)
+                    .approved(true)
+                    .university(defaultUni)
+                    .build());
         }
 
         final University finalUni = defaultUni;
@@ -364,7 +340,6 @@ public class DataInitializer implements CommandLineRunner {
                         .courseName("CSE 3105 - Compiler Design")
                         .fileName("LL1_Parsing_Notes.pdf")
                         .contentType("application/pdf")
-                        .fileData(new byte[10]) // stub data
                         .uploadedBy(testTeacher)
                         .approved(true)
                         .examTags("CT1")
@@ -378,7 +353,6 @@ public class DataInitializer implements CommandLineRunner {
                         .courseName("CSE 3101 - Database Systems")
                         .fileName("Normalization_Guide.pdf")
                         .contentType("application/pdf")
-                        .fileData(new byte[10])
                         .uploadedBy(testTeacher)
                         .approved(true)
                         .examTags("CT1")

@@ -21,7 +21,7 @@ public class SystemMetadata {
     @Column(name = "meta_value", nullable = false)
     private String value;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "university_id")
     private University university;
 }

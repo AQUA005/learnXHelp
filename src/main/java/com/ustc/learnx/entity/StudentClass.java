@@ -22,11 +22,11 @@ public class StudentClass {
     private String department;
     private String section;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "university_id")
     private University university;
 
-    @OneToMany(mappedBy = "studentClass")
+    @OneToMany(mappedBy = "studentClass", fetch = FetchType.LAZY)
     @JsonIgnore
     private List<User> students;
 

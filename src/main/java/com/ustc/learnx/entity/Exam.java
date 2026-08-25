@@ -22,7 +22,7 @@ public class Exam {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @ManyToOne(optional = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "teacher_id", nullable = false)
     private User teacher;
 
@@ -34,11 +34,11 @@ public class Exam {
     @Column(nullable = false)
     private boolean published;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "student_class_id")
     private StudentClass studentClass;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "university_id")
     private University university;
 }

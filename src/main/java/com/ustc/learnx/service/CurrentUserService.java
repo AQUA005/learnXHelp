@@ -2,15 +2,14 @@ package com.ustc.learnx.service;
 
 import com.ustc.learnx.common.AccessDeniedException;
 import com.ustc.learnx.entity.StudentClass;
-import com.ustc.learnx.entity.SystemAdmin;
 import com.ustc.learnx.entity.University;
 import com.ustc.learnx.entity.User;
-import com.ustc.learnx.repository.SystemAdminRepository;
 import com.ustc.learnx.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -26,7 +25,6 @@ import java.util.Optional;
 public class CurrentUserService {
 
     private final UserRepository userRepository;
-    private final SystemAdminRepository systemAdminRepository;
 
     /** The authenticated username, or empty if the request is anonymous. */
     public Optional<String> currentUsername() {
@@ -37,27 +35,25 @@ public class CurrentUserService {
         return Optional.ofNullable(auth.getName());
     }
 
-    /** The authenticated {@link User}, or empty for anonymous or system-admin callers. */
+    /** The authenticated account, or empty if the request is anonymous. */
+    @Transactional(readOnly = true)
     public Optional<User> currentUser() {
         return currentUsername().flatMap(userRepository::findByUsername);
     }
 
-    /** The authenticated {@link User}, or 403 if there isn't one. */
+    /** The authenticated account, or 403 if there isn't one. */
     public User requireCurrentUser() {
         return currentUser().orElseThrow(
-                () -> new AccessDeniedException("No authenticated university user for this request"));
+                () -> new AccessDeniedException("No authenticated user for this request"));
     }
 
-    /** The authenticated platform administrator, if the caller is one. */
-    public Optional<SystemAdmin> currentSystemAdmin() {
-        return currentUsername().flatMap(systemAdminRepository::findByUsername);
-    }
-
+    /** Platform administrators sit above any single university. */
     public boolean isSystemAdmin() {
-        return currentSystemAdmin().isPresent();
+        return currentUser().map(u -> u.getRole() == User.Role.SYSTEM_ADMIN).orElse(false);
     }
 
     /** The caller's university, or 403 if they have none. */
+    @Transactional(readOnly = true)
     public University requireUniversity() {
         University university = requireCurrentUser().getUniversity();
         if (university == null) {
@@ -74,13 +70,18 @@ public class CurrentUserService {
      * Asserts that {@code target} belongs to the caller's university.
      * Platform administrators bypass this check.
      *
-     * @param target the university an object under access belongs to
+     * @param target the university that the object under access belongs to
      */
+    @Transactional(readOnly = true)
     public void assertSameUniversity(University target) {
-        if (isSystemAdmin()) {
+        User me = requireCurrentUser();
+        if (me.getRole() == User.Role.SYSTEM_ADMIN) {
             return;
         }
-        University own = requireUniversity();
+        University own = me.getUniversity();
+        if (own == null) {
+            throw new AccessDeniedException("Your account is not attached to a university");
+        }
         if (target == null || !own.getId().equals(target.getId())) {
             throw new AccessDeniedException("That item belongs to a different university");
         }
@@ -90,11 +91,12 @@ public class CurrentUserService {
      * Asserts that {@code target} is the caller's own class. Teachers and above
      * are allowed across classes within their university.
      */
+    @Transactional(readOnly = true)
     public void assertSameClass(StudentClass target) {
-        if (isSystemAdmin()) {
+        User me = requireCurrentUser();
+        if (me.getRole() == User.Role.SYSTEM_ADMIN) {
             return;
         }
-        User me = requireCurrentUser();
         if (me.getRole() == User.Role.TEACHER || me.getRole() == User.Role.ADMIN) {
             assertSameUniversity(target == null ? null : target.getUniversity());
             return;

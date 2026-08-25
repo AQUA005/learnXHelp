@@ -30,7 +30,7 @@ public class Course {
     @Column(nullable = false)
     private String department; // e.g., CSE - Computer Science & Engineering
 
-    @ManyToOne(optional = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "university_id")
     private University university;
 }

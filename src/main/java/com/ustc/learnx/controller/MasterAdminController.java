@@ -47,7 +47,6 @@ public class MasterAdminController {
     private final StudentClassRepository studentClassRepository;
     private final CourseRepository courseRepository;
     private final SystemMetadataRepository systemMetadataRepository;
-    private final SystemAdminRepository systemAdminRepository;
     private final BugReportRepository bugReportRepository;
     private final org.springframework.mail.javamail.JavaMailSender mailSender;
     private final org.springframework.core.env.Environment env;
@@ -315,11 +314,8 @@ public class MasterAdminController {
         if (principal == null) {
             return ResponseEntity.status(401).body(Map.of("error", "Not authenticated"));
         }
-        Optional<SystemAdmin> sysAdminOpt = systemAdminRepository.findByUsername(principal.getName());
-        if (sysAdminOpt.isEmpty()) {
-            return ResponseEntity.status(404).body(Map.of("error", "Master account not found"));
-        }
-        SystemAdmin sysAdmin = sysAdminOpt.get();
+        User sysAdmin = userRepository.findByUsername(principal.getName())
+                .orElseThrow(() -> new com.ustc.learnx.common.NotFoundException("Master account not found"));
 
         if (request.getFullName() != null && !request.getFullName().trim().isEmpty()) {
             sysAdmin.setFullName(request.getFullName().trim());
@@ -331,7 +327,7 @@ public class MasterAdminController {
             sysAdmin.setPassword(passwordEncoder.encode(request.getPassword().trim()));
         }
 
-        systemAdminRepository.save(sysAdmin);
+        userRepository.save(sysAdmin);
         return ResponseEntity.ok(Map.of(
                 "message", "Master profile updated successfully!",
                 "fullName", sysAdmin.getFullName(),

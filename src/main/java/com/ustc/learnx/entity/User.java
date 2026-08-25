@@ -44,12 +44,13 @@ public class User {
     @Column(columnDefinition = "TEXT")
     private String profilePicUrl;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "student_class_id")
     @com.fasterxml.jackson.annotation.JsonIgnoreProperties("students")
     private StudentClass studentClass;
 
-    @ManyToOne
+    /** Null for a SYSTEM_ADMIN, who sits above any single university. */
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "university_id")
     private University university;
 
@@ -57,6 +58,9 @@ public class User {
         STUDENT,
         CR,
         TEACHER,
-        ADMIN
+        /** Administrator of a single university. */
+        ADMIN,
+        /** Platform owner. Not attached to any university. */
+        SYSTEM_ADMIN
     }
 }

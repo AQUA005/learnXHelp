@@ -31,11 +31,11 @@ public class Announcement {
     @Column(nullable = false)
     private String createdByRole;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "student_class_id")
     private StudentClass studentClass;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "university_id")
     private University university;
 }

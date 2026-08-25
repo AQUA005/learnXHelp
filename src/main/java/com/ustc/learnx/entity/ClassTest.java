@@ -27,11 +27,11 @@ public class ClassTest {
     private String topic;
     private String createdBy; // username of CR or Teacher
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "student_class_id")
     private StudentClass studentClass;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "university_id")
     private University university;
 }

@@ -34,6 +34,19 @@ public class ApiExceptionHandler {
         return problem(HttpStatus.FORBIDDEN, "You do not have permission to perform this action");
     }
 
+    @ExceptionHandler(com.ustc.learnx.service.storage.FileStorageService.InvalidUploadException.class)
+    public ProblemDetail handleInvalidUpload(
+            com.ustc.learnx.service.storage.FileStorageService.InvalidUploadException ex) {
+        return problem(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(com.ustc.learnx.service.storage.FileStorageService.StorageException.class)
+    public ProblemDetail handleStorageFailure(
+            com.ustc.learnx.service.storage.FileStorageService.StorageException ex) {
+        log.error("File storage failed", ex);
+        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Could not process the file");
+    }
+
     /** Constraint violations must not surface SQL or column names to callers. */
     @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
     public ProblemDetail handleDataIntegrity(org.springframework.dao.DataIntegrityViolationException ex) {

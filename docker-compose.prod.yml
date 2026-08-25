@@ -1,0 +1,53 @@
+# Full production-shaped stack: application, database, and the two volumes that
+# must survive a container restart.
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Every secret comes from the environment. Create a .env file beside this one
+# (it is gitignored) defining at least POSTGRES_PASSWORD; the mail settings are
+# needed for signup and password-recovery email.
+#
+# Terminate TLS in front of this stack. The prod profile marks the session
+# cookie Secure, so the application must be reached over HTTPS.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-learnx}
+      POSTGRES_USER: ${POSTGRES_USER:-learnx}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-learnx} -d ${POSTGRES_DB:-learnx}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-learnx}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-learnx}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      # Uploaded study material lands on the mounted volume below.
+      LEARNX_STORAGE_ROOT: /var/lib/learnx/files
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    volumes:
+      - learnx-files:/var/lib/learnx/files
+
+volumes:
+  pgdata:
+  learnx-files:

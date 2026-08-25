@@ -25,11 +25,23 @@ public class Resource {
 
     private String contentType;
 
-    @Lob
-    @Column(length = 104857600) // Support up to 100MB in database
-    private byte[] fileData;
+    /**
+     * Location of the uploaded file within the storage root.
+     *
+     * <p>File bytes live on disk, not in this row. Holding them here meant every
+     * library listing loaded every file into memory before discarding it.
+     */
+    @Column(name = "storage_key", length = 200)
+    private String storageKey;
 
-    @ManyToOne(optional = false)
+    /** Size in bytes, so listings can show it without touching the file. */
+    private Long fileSize;
+
+    /** SHA-256 of the stored bytes, for integrity checks and de-duplication. */
+    @Column(length = 64)
+    private String sha256;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "uploader_id", nullable = false)
     private User uploadedBy;
 
@@ -40,11 +52,11 @@ public class Resource {
 
     private String driveLink; // Direct Google Drive resources link
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "student_class_id")
     private StudentClass studentClass;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "university_id")
     private University university;
 

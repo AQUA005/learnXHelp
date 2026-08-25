@@ -5,65 +5,87 @@ announcements and class tests, online exams, and a gradebook.
 
 ## Stack
 
-- Java 21, Spring Boot 4.0.6 (Web, Security, Data JPA, Validation, Mail)
-- PostgreSQL (H2 for local dev until the Phase 2 migration lands)
-- Frontend: static SPA under `src/main/resources/static` (React + Vite rewrite planned — Phase 4)
+- Java 21, Spring Boot 4.0.6 (Web, Security, Data JPA, Validation, Mail, Flyway)
+- PostgreSQL, with schema owned by Flyway migrations
+- Frontend: static SPA under `src/main/resources/static` (React + Vite rewrite planned)
 
 ## Running locally
 
 ```bash
-./mvnw spring-boot:run
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-The app starts on <http://localhost:8080>. With no datasource env vars set it uses a
-file-backed H2 database at `~/.learnx/learnxdb`.
+The app starts on <http://localhost:8080>. With no datasource variables set it uses a
+local H2 file at `~/.learnx` running in PostgreSQL compatibility mode, so the same
+migrations apply as in production. The `dev` profile also seeds demo accounts and
+enables the H2 console at `/h2-console`.
 
-Build a runnable jar:
+Demo accounts (dev profile only, all with password `password`): `master`, `admin`,
+`teacher`, `cr`, `student`.
+
+To run against a real PostgreSQL instead:
 
 ```bash
-./mvnw clean package
+docker compose up -d
 ```
-
-Run the container:
 
 ```bash
-docker build -t learnx . && docker run -p 8080:8080 learnx
+SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/learnx SPRING_DATASOURCE_USERNAME=learnx SPRING_DATASOURCE_PASSWORD=learnx ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 ```
+
+## Testing
+
+```bash
+./mvnw test
+```
+
+Tests run the real Flyway migrations against H2 in PostgreSQL compatibility mode and
+boot with `ddl-auto=validate`, so a mismatch between an entity and the schema fails the
+build. `AuthorizationMatrixTest` asserts what each role may call on every sensitive
+endpoint.
+
+## Deploying
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Put a TLS-terminating reverse proxy in front: the `prod` profile marks the session
+cookie `Secure`. Two volumes must persist — `pgdata` for the database and
+`learnx-files` for uploaded study material.
 
 ## Configuration
 
-All settings are environment variables with local-dev defaults — no secrets live in the repo.
+All settings are environment variables. No secrets live in the repo.
 
 | Variable | Purpose | Default |
 |---|---|---|
 | `PORT` | HTTP listen port | `8080` |
-| `SPRING_DATASOURCE_URL` | JDBC URL (also accepts `JDBC_DATABASE_URL`) | H2 file at `~/.learnx` |
-| `SPRING_DATASOURCE_USERNAME` | DB user | `sa` |
-| `SPRING_DATASOURCE_PASSWORD` | DB password | *(empty)* |
-| `DATABASE_DIR` | Directory for the H2 file | `~/.learnx` |
-| `SPRING_MAIL_HOST` / `SPRING_MAIL_PORT` | SMTP endpoint | `smtp.gmail.com` / `587` |
-| `SPRING_MAIL_USERNAME` / `SPRING_MAIL_PASSWORD` | SMTP credentials | *(empty)* |
+| `SPRING_PROFILES_ACTIVE` | `dev`, `prod`, or unset | *(none)* |
+| `SPRING_DATASOURCE_URL` | JDBC URL (also accepts `JDBC_DATABASE_URL`) | local H2 file |
+| `SPRING_DATASOURCE_USERNAME` / `_PASSWORD` | Database credentials | `sa` / *(empty)* |
+| `LEARNX_STORAGE_ROOT` | Directory holding uploaded files | system temp dir |
+| `SPRING_MAIL_HOST` / `_PORT` | SMTP endpoint | `smtp.gmail.com` / `587` |
+| `SPRING_MAIL_USERNAME` / `_PASSWORD` | SMTP credentials | *(empty)* |
 
-Never commit real credentials — `.gitignore` blocks `.env`, `*.pem`, `*.key`, `*.jks`, `*.p12`.
+## Architecture notes
 
-## Roles
+**Schema.** Owned by `src/main/resources/db/migration`. Hibernate never alters it —
+`ddl-auto` is `validate`. Add a new `V<n>__description.sql` rather than editing an
+applied migration.
 
-`STUDENT` → `CR` → `TEACHER` → `ADMIN` → `SYSTEM_ADMIN`, in increasing order of privilege.
-New signups require administrator approval before they can log in.
+**Uploaded files** are written under `LEARNX_STORAGE_ROOT` and referenced from the
+`resources` row by a server-generated key; they are streamed on download. File bytes
+are never held in the database or buffered in the heap.
 
-## Project layout
+**Authorization** is enforced server-side with `@PreAuthorize` on every controller,
+over a role hierarchy: `STUDENT` → `CR` → `TEACHER` → `ADMIN` → `SYSTEM_ADMIN`, each
+implying the ones before it. Endpoints name only the minimum role they require.
+Ownership and university scoping are checked through `CurrentUserService`.
 
-```
-src/main/java/com/ustc/learnx/
-  config/      security, seed data
-  controller/  REST endpoints
-  entity/      JPA entities
-  repository/  Spring Data repositories
-  service/     domain logic
-src/main/resources/static/   current SPA (app.js, index.html, style.css)
-```
+**Tenancy** is derived from the authenticated account, never from a request header.
+The deployment serves one university, seeded by migration `V2`, but rows carry a
+`university_id` so multi-tenancy remains possible.
 
-## Refactor in progress
-
-This codebase is mid-refactor toward production readiness: security lockdown,
-PostgreSQL + Flyway migrations, a service/DTO layer, and a React + TypeScript frontend.
+**Associations are lazy.** Queries that feed an endpoint declare what they need with
+`@EntityGraph`, so a listing costs a fixed number of queries rather than one per row.
