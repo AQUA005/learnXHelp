@@ -1,0 +1,69 @@
+# Render blueprint for LearnX.
+#
+# In the Render dashboard: New > Blueprint, point it at this repository, and
+# Render reads this file to create the web service, the PostgreSQL database and
+# the disk that holds uploaded files.
+#
+# Two values are marked sync: false. Render will prompt for them and will not
+# store them in this file, which is what keeps them out of the repository.
+# See DEPLOYING.md for the walk-through.
+
+databases:
+  - name: learnx-db
+    databaseName: learnx
+    user: learnx
+    # Check the available plans in the dashboard; a paid plan is needed for a
+    # database that is not removed after a trial period.
+    plan: free
+
+services:
+  - type: web
+    name: learnx
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+
+      # Render publishes this as postgresql://user:password@host/database.
+      # The application converts it to a JDBC URL at startup.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: learnx-db
+          property: connectionString
+
+      # Uploaded study material is written here, on the disk mounted below.
+      - key: LEARNX_STORAGE_ROOT
+        value: /var/lib/learnx/files
+
+      # Creates the first administrator, once, on a database with no accounts.
+      # Render prompts for these; remove the password once you have signed in
+      # and changed it.
+      - key: LEARNX_ADMIN_USERNAME
+        sync: false
+      - key: LEARNX_ADMIN_PASSWORD
+        sync: false
+      - key: LEARNX_ADMIN_EMAIL
+        sync: false
+
+      # Optional: needed only for sign-up and password-recovery email. Leave
+      # unset and the rest of the application still works.
+      - key: SPRING_MAIL_HOST
+        sync: false
+      - key: SPRING_MAIL_PORT
+        value: "587"
+      - key: SPRING_MAIL_USERNAME
+        sync: false
+      - key: SPRING_MAIL_PASSWORD
+        sync: false
+
+    # Without a disk the container's filesystem is replaced on every deploy and
+    # every uploaded file is lost. A disk requires a paid instance type; if you
+    # stay on the free plan, remove this block and expect uploads to disappear
+    # when the service restarts.
+    disk:
+      name: learnx-files
+      mountPath: /var/lib/learnx/files
+      sizeGB: 1
