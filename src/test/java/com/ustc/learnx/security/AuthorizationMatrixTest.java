@@ -206,25 +206,40 @@ class AuthorizationMatrixTest {
     }
 
     /**
-     * A body that binds against every write endpoint covered here.
+     * A body that binds and validates against every write endpoint covered here.
      *
-     * <p>Request bodies are deserialized before method security runs, so a body
-     * that fails to bind produces a 400 and the authorization rule is never
-     * exercised. Jackson rejects absent primitives, so this supplies every
-     * primitive field appearing in the request types across these controllers;
-     * unknown properties are ignored, which lets one body serve all of them.
+     * <p>Spring resolves and validates the request body before method security
+     * runs, so an invalid body answers 400 and the authorization rule is never
+     * reached. To keep these cases about authorization alone, this supplies
+     * every primitive Jackson requires and every field Bean Validation demands
+     * across these controllers. Unknown properties are ignored, so one body
+     * serves all of them.
      */
     private static final String BINDABLE_BODY = """
-            {"global":false,"guest":false,"published":false,"durationMinutes":0,\
-            "points":0,"marksObtained":0,"maxMarks":0,"classAverage":0,\
-            "classHighest":0,"percentile":0,"alreadySubmitted":false}""";
+            {"global":false,"guest":false,"published":false,"durationMinutes":1,\
+            "points":1,"marksObtained":0,"maxMarks":0,"classAverage":0,\
+            "classHighest":0,"percentile":0,"alreadySubmitted":false,\
+            "title":"t","content":"c","courseName":"c","type":"DEPARTMENT","value":"v",\
+            "dayOfWeek":"MONDAY","startTime":"10:00:00","endTime":"11:00:00",\
+            "dateTime":"2026-09-01T10:00:00"}""";
+
+    /**
+     * Exams carry their times as ISO date-time strings, where a schedule item
+     * uses a plain time of day, so the two cannot share one body.
+     */
+    private static final String EXAM_BODY = """
+            {"title":"t","description":"d","durationMinutes":1,\
+            "startTime":"2026-09-01T10:00:00","endTime":"2026-09-01T11:00:00",\
+            "questions":[{"questionText":"q","questionType":"MCQ","points":1,\
+            "correctAnswer":"A"}]}""";
 
     private static MockHttpServletRequestBuilder request(String method, String path) {
         String target = path.trim();
+        String body = target.startsWith("/api/exams") ? EXAM_BODY : BINDABLE_BODY;
         return switch (method.trim().toUpperCase()) {
             case "GET" -> get(target);
-            case "POST" -> post(target).contentType(MediaType.APPLICATION_JSON).content(BINDABLE_BODY);
-            case "PUT" -> put(target).contentType(MediaType.APPLICATION_JSON).content(BINDABLE_BODY);
+            case "POST" -> post(target).contentType(MediaType.APPLICATION_JSON).content(body);
+            case "PUT" -> put(target).contentType(MediaType.APPLICATION_JSON).content(body);
             case "DELETE" -> delete(target);
             default -> throw new IllegalArgumentException("Unsupported method: " + method);
         };

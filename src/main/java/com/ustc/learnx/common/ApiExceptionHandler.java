@@ -5,6 +5,9 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 /**
  * Maps domain exceptions to HTTP responses.
  *
@@ -45,6 +48,48 @@ public class ApiExceptionHandler {
             com.ustc.learnx.service.storage.FileStorageService.StorageException ex) {
         log.error("File storage failed", ex);
         return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Could not process the file");
+    }
+
+    @ExceptionHandler(ValidationException.class)
+    public ProblemDetail handleValidation(ValidationException ex) {
+        return problem(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    /**
+     * Bean Validation failures, reported per field so a client can point at the
+     * input that needs fixing rather than showing a bare "Bad Request".
+     */
+    @ExceptionHandler(org.springframework.web.bind.MethodArgumentNotValidException.class)
+    public ProblemDetail handleInvalidBody(
+            org.springframework.web.bind.MethodArgumentNotValidException ex) {
+        Map<String, String> fieldErrors = new LinkedHashMap<>();
+        for (org.springframework.validation.FieldError error : ex.getBindingResult().getFieldErrors()) {
+            fieldErrors.putIfAbsent(error.getField(), error.getDefaultMessage());
+        }
+        for (org.springframework.validation.ObjectError error : ex.getBindingResult().getGlobalErrors()) {
+            fieldErrors.putIfAbsent(error.getObjectName(), error.getDefaultMessage());
+        }
+
+        String summary = fieldErrors.isEmpty()
+                ? "The submitted data is not valid"
+                : String.join("; ", fieldErrors.values());
+
+        ProblemDetail detail = problem(HttpStatus.BAD_REQUEST, summary);
+        detail.setProperty("errors", fieldErrors);
+        return detail;
+    }
+
+    /**
+     * A body that could not be parsed at all. Jackson rejects a missing
+     * primitive, so this commonly means a form omitted a numeric field; the
+     * response says so instead of surfacing the parser's message.
+     */
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ProblemDetail handleUnreadableBody(
+            org.springframework.http.converter.HttpMessageNotReadableException ex) {
+        log.debug("Rejected an unreadable request body", ex);
+        return problem(HttpStatus.BAD_REQUEST,
+                "The request body is missing or malformed");
     }
 
     /** Constraint violations must not surface SQL or column names to callers. */
