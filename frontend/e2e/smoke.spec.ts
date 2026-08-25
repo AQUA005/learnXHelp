@@ -5,6 +5,10 @@ import { expect, test } from '@playwright/test'
  * and the notes library, sit an exam, and sign out.
  *
  * Runs against the demo data the dev profile seeds.
+ *
+ * Page headings are addressed by level. A card heading can carry the same
+ * words as the page it sits on, and does while its data loads, so matching on
+ * text alone made the outcome depend on how quickly the server replied.
  */
 
 async function signIn(page: import('@playwright/test').Page, username: string) {
@@ -28,16 +32,16 @@ test('a student can sign in and reach every screen', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Good')
 
   await page.getByRole('link', { name: 'Class routine' }).click()
-  await expect(page.getByRole('heading', { name: 'Class routine' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Class routine' })).toBeVisible()
 
   await page.getByRole('link', { name: 'Notes library' }).click()
-  await expect(page.getByRole('heading', { name: 'Notes library' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Notes library' })).toBeVisible()
 
   await page.getByRole('link', { name: 'Announcements' }).click()
-  await expect(page.getByRole('heading', { name: 'Announcements' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Announcements' })).toBeVisible()
 
   await page.getByRole('link', { name: 'My results' }).click()
-  await expect(page.getByRole('heading', { name: 'My results' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'My results' })).toBeVisible()
 
   await signOut(page)
 })
@@ -46,7 +50,8 @@ test('a student can sit an exam and see the result recorded', async ({ page }) =
   await signIn(page, 'student')
 
   await page.getByRole('link', { name: 'Exams', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Exams', exact: true })).toBeVisible()
+  // The page heading, addressed by level so a card title can never collide.
+  await expect(page.getByRole('heading', { level: 1, name: 'Exams' })).toBeVisible()
 
   // The seeded data always contains an exam. Asserting that rather than
   // skipping means a broken exam list fails here instead of passing quietly.
@@ -98,7 +103,7 @@ test('an administrator sees the administration screens', async ({ page }) => {
   await signIn(page, 'admin')
 
   await page.getByRole('link', { name: 'Administration' }).click()
-  await expect(page.getByRole('heading', { name: 'Administration' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Administration' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Account approvals' })).toBeVisible()
 })
 

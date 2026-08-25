@@ -39,7 +39,7 @@ export default function ExamsPage() {
 
       {canAuthor && <ExamCreator />}
 
-      <Card title={exams.isLoading ? 'Exams' : `${items.length} exam${items.length === 1 ? '' : 's'}`}>
+      <Card title={exams.isLoading ? 'Your exams' : `${items.length} exam${items.length === 1 ? '' : 's'}`}>
         {exams.isLoading ? (
           <Loading rows={3} />
         ) : items.length === 0 ? (
