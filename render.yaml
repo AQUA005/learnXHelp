@@ -52,8 +52,13 @@ services:
       # unset and the rest of the application still works.
       - key: SPRING_MAIL_HOST
         sync: false
+      # 2525, not the usual 587: Render blocks outgoing connections on ports
+      # 25, 465 and 587 from its free instance types, and a blocked port does
+      # not refuse the connection, it swallows it — every send then hangs until
+      # it times out. Brevo, SMTP2GO, Mailjet and Mailgun all accept
+      # submissions on 2525. On a paid instance either port works.
       - key: SPRING_MAIL_PORT
-        value: "587"
+        value: "2525"
       - key: SPRING_MAIL_USERNAME
         sync: false
       - key: SPRING_MAIL_PASSWORD
