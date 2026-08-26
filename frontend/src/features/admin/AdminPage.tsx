@@ -5,15 +5,16 @@ import { api } from '@/lib/api'
 import { useToast } from '@/lib/toast'
 import { formatDateTime } from '@/lib/format'
 import type { MetadataOption, PendingUser } from '@/lib/types'
-import { Badge, Card, EmptyState, Field, Loading, PageHeader } from '@/components/ui'
+import { Alert, Badge, Card, EmptyState, Field, Loading, PageHeader } from '@/components/ui'
 
-type Tab = 'approvals' | 'classes' | 'metadata' | 'audit'
+type Tab = 'approvals' | 'people' | 'classes' | 'metadata' | 'audit'
 
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>('approvals')
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'approvals', label: 'Account approvals' },
+    { id: 'people', label: 'People' },
     { id: 'classes', label: 'Classes' },
     { id: 'metadata', label: 'Dropdown options' },
     { id: 'audit', label: 'Change history' },
@@ -36,6 +37,7 @@ export default function AdminPage() {
       </div>
 
       {tab === 'approvals' && <Approvals />}
+      {tab === 'people' && <People />}
       {tab === 'classes' && <Classes />}
       {tab === 'metadata' && <Metadata />}
       {tab === 'audit' && <AuditTrail />}
@@ -127,6 +129,136 @@ function Approvals() {
   )
 }
 
+
+type Person = {
+  id: number
+  username: string
+  fullName: string
+  email: string
+  role: string
+  approved: boolean
+}
+
+/**
+ * Everyone at the university, and the way back in for someone who cannot sign
+ * in. Self-service recovery needs working email; where that is unavailable this
+ * is the only route, so it lives with the everyday administration screens
+ * rather than being hidden away.
+ */
+function People() {
+  const { notify, reportError } = useToast()
+  const [search, setSearch] = useState('')
+  const [issued, setIssued] = useState<{ username: string; password: string } | null>(null)
+
+  const people = useQuery({
+    queryKey: ['people'],
+    queryFn: () => api.get<Person[]>('/api/admin/users'),
+  })
+
+  const reset = useMutation({
+    mutationFn: (id: number) =>
+      api.post<{ message: string; username: string; password: string }>(
+        `/api/admin/users/${id}/reset-password`,
+        {},
+      ),
+    onSuccess: (result) => {
+      setIssued({ username: result.username, password: result.password })
+      notify(result.message, 'success')
+    },
+    onError: (error) => reportError(error),
+  })
+
+  const needle = search.trim().toLowerCase()
+  const visible = (people.data ?? []).filter(
+    (person) =>
+      !needle ||
+      person.fullName.toLowerCase().includes(needle) ||
+      person.username.toLowerCase().includes(needle) ||
+      person.email.toLowerCase().includes(needle),
+  )
+
+  return (
+    <>
+      {issued && (
+        <Card title="New password">
+          <Alert kind="success">
+            Give this to <strong>{issued.username}</strong> and ask them to change it once they
+            have signed in. It is shown only now and cannot be looked up again.
+          </Alert>
+          <p className="mono" style={{ fontSize: '1.3rem', letterSpacing: '0.05em', margin: 0 }}>
+            {issued.password}
+          </p>
+          <div className="row row-end" style={{ marginTop: '0.8rem' }}>
+            <button className="btn btn-secondary btn-sm" onClick={() => setIssued(null)}>
+              Done
+            </button>
+          </div>
+        </Card>
+      )}
+
+      <Card
+        title={people.isLoading ? 'Everyone' : `${visible.length} of ${(people.data ?? []).length}`}
+        actions={
+          <input
+            placeholder="Search by name, username or email"
+            aria-label="Search people"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        }
+      >
+        {people.isLoading ? (
+          <Loading rows={4} />
+        ) : visible.length === 0 ? (
+          <EmptyState title="Nobody found" hint="Try a different search." />
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Username</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((person) => (
+                  <tr key={person.id}>
+                    <td>
+                      {person.fullName}
+                      {!person.approved && (
+                        <>
+                          {' '}
+                          <Badge kind="warning">awaiting approval</Badge>
+                        </>
+                      )}
+                    </td>
+                    <td className="mono">{person.username}</td>
+                    <td className="small">{person.email}</td>
+                    <td>
+                      <Badge>{person.role}</Badge>
+                    </td>
+                    <td>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => reset.mutate(person.id)}
+                        disabled={reset.isPending}
+                      >
+                        Reset password
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </>
+  )
+}
 type ClassGroup = {
   id: number
   className: string
