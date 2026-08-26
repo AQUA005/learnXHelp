@@ -39,7 +39,7 @@ public final class DatabaseUrl {
             return Optional.empty();
         }
 
-        String raw = firstPresent(environment, "DATABASE_URL", "POSTGRES_URL", "POSTGRESQL_URL");
+        String raw = clean(firstPresent(environment, "DATABASE_URL", "POSTGRES_URL", "POSTGRESQL_URL"));
         if (!hasText(raw)) {
             return Optional.empty();
         }
@@ -56,7 +56,7 @@ public final class DatabaseUrl {
     private static Optional<JdbcSettings> parse(String raw) {
         URI uri;
         try {
-            uri = new URI(raw.trim());
+            uri = new URI(raw);
         } catch (URISyntaxException e) {
             return Optional.empty();
         }
@@ -112,6 +112,34 @@ public final class DatabaseUrl {
             }
         }
         return null;
+    }
+
+    /**
+     * Reports whether the platform published a database URL at all.
+     *
+     * <p>Lets a caller tell "no database was configured" apart from "a database
+     * was configured but could not be used", which are the same empty result
+     * from {@link #from(Map)} but mean very different things in production.
+     */
+    public static boolean isPublished(Map<String, String> environment) {
+        return hasText(firstPresent(environment, "DATABASE_URL", "POSTGRES_URL", "POSTGRESQL_URL"));
+    }
+
+    /**
+     * Removes what a copy and paste from a provider's dashboard tends to bring
+     * with it: surrounding whitespace, a trailing newline, and the quotes from a
+     * {@code psql '...'} example. Without this the value is not a URL, and the
+     * application quietly starts on its local H2 fallback instead.
+     */
+    private static String clean(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        boolean quoted = trimmed.length() >= 2
+                && ((trimmed.startsWith("\"") && trimmed.endsWith("\""))
+                        || (trimmed.startsWith("'") && trimmed.endsWith("'")));
+        return quoted ? trimmed.substring(1, trimmed.length() - 1).trim() : trimmed;
     }
 
     private static boolean hasText(String value) {
