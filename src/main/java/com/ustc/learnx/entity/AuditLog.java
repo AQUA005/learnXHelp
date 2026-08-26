@@ -32,4 +32,15 @@ public class AuditLog {
 
     @Column(columnDefinition = "TEXT")
     private String details;
+
+    /**
+     * Whose audit trail this entry belongs to.
+     *
+     * <p>Null for entries that predate any tenant: a failed sign-in is recorded
+     * before an account is resolved, and platform-level actions belong to no
+     * university. Only a platform owner sees those.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "university_id")
+    private University university;
 }

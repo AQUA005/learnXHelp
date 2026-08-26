@@ -20,8 +20,9 @@ local H2 file at `~/.learnx` running in PostgreSQL compatibility mode, so the sa
 migrations apply as in production. The `dev` profile also seeds demo accounts and
 enables the H2 console at `/h2-console`.
 
-Demo accounts (dev profile only, all with password `password`): `master`, `admin`,
-`teacher`, `cr`, `student`.
+Accounts sign in with an **email address**, not a username. Demo accounts (dev profile
+only, all with password `password`): `master@learnx.com` (the platform owner),
+`admin@learnx.help`, `teacher@learnx.help`, `cr@learnx.help`, `student@learnx.help`.
 
 To run against a real PostgreSQL instead:
 
@@ -100,8 +101,14 @@ implying the ones before it. Endpoints name only the minimum role they require.
 Ownership and university scoping are checked through `CurrentUserService`.
 
 **Tenancy** is derived from the authenticated account, never from a request header.
-The deployment serves one university, seeded by migration `V2`, but rows carry a
-`university_id` so multi-tenancy remains possible.
+The platform hosts many universities: migration `V2` seeds the first, a `SYSTEM_ADMIN`
+adds the rest, and each is listed publicly and open for signup only once `published`
+is set. Every tenant-owned row carries a `university_id`, and any endpoint taking an
+id in its path asserts ownership through `CurrentUserService` before acting on it.
+
+**Identity.** Email is the sign-in credential and is globally unique. `username` is
+generated from it and never typed — it remains the Spring Security principal, and two
+columns reference it as a string, so it cannot simply be dropped.
 
 **Associations are lazy.** Queries that feed an endpoint declare what they need with
 `@EntityGraph`, so a listing costs a fixed number of queries rather than one per row.

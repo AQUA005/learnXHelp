@@ -12,6 +12,7 @@ import org.springframework.test.context.TestPropertySource;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Checks what the migrations actually produce.
@@ -49,7 +50,7 @@ class MigrationSchemaTest {
                 String.class);
         // Update this list when adding a migration, so a script that fails to
         // apply cannot pass unnoticed.
-        assertThat(versions).containsExactly("1", "2", "3");
+        assertThat(versions).containsExactly("1", "2", "3", "4");
     }
 
     /** Tables the application cannot function without. */
@@ -59,7 +60,8 @@ class MigrationSchemaTest {
             "class_course_assignments", "system_metadata", "schedule_items",
             "class_tests", "exams", "exam_questions", "exam_submissions",
             "gradebooks", "resources", "resource_reactions", "announcements",
-            "audit_logs", "bug_reports", "profile_change_requests", "promotion_history"
+            "audit_logs", "bug_reports", "profile_change_requests", "promotion_history",
+            "platform_settings"
     })
     void tableExists(String table) {
         Integer count = jdbc.queryForObject(
@@ -96,6 +98,99 @@ class MigrationSchemaTest {
                         + "WHERE UPPER(table_name) = 'USERS' AND UPPER(column_name) = 'UNIVERSITY_ID'",
                 String.class);
         assertThat(nullable).isEqualToIgnoringCase("YES");
+    }
+
+    // --- V4: the multi-tenant platform ---
+
+    @Test
+    void universitiesCarryAPublicProfile() {
+        assertThat(columnsOf("universities")).contains(
+                "SLUG", "DESCRIPTION", "CONTACT_EMAIL", "CONTACT_PHONE", "WEBSITE",
+                "ADDRESS", "LOGO_KEY", "PUBLISHED", "CREATED_AT", "UPDATED_AT");
+    }
+
+    /**
+     * The seeded university must be published, or applying V4 empties the public
+     * homepage of the deployment it is applied to.
+     */
+    @Test
+    void theSeededUniversityIsPublishedAndHasASlug() {
+        Integer published = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM universities WHERE published = TRUE AND slug IS NOT NULL",
+                Integer.class);
+        assertThat(published).isEqualTo(1);
+
+        String slug = jdbc.queryForObject(
+                "SELECT slug FROM universities WHERE domain = 'ustc.ac.bd'", String.class);
+        // Dot-free, so it is safe in a URL path segment.
+        assertThat(slug).isEqualTo("ustc-ac-bd").doesNotContain(".");
+    }
+
+    @Test
+    void platformBrandingIsASingleSeededRow() {
+        Integer rows = jdbc.queryForObject("SELECT COUNT(*) FROM platform_settings", Integer.class);
+        assertThat(rows).isEqualTo(1);
+
+        String siteName = jdbc.queryForObject(
+                "SELECT site_name FROM platform_settings WHERE id = 1", String.class);
+        assertThat(siteName).isEqualTo("LearnX");
+    }
+
+    /** The check constraint is what makes "single row" true rather than merely intended. */
+    @Test
+    void aSecondPlatformSettingsRowIsRefused() {
+        assertThatThrownBy(() -> jdbc.update(
+                "INSERT INTO platform_settings (id, site_name) VALUES (2, 'Impostor')"))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+    }
+
+    /**
+     * Without this column an administrator reading the audit trail sees every
+     * university's entries, not their own.
+     */
+    @Test
+    void auditEntriesKnowWhichUniversityTheyBelongTo() {
+        assertThat(columnsOf("audit_logs")).contains("UNIVERSITY_ID");
+    }
+
+    @Test
+    void aClassBelongsToExactlyOneUniversity() {
+        assertThat(isNullable("student_classes", "university_id")).isEqualToIgnoringCase("NO");
+    }
+
+    /**
+     * Two universities can each run a "CSE / Batch 21 / Section A". Before this
+     * they would have shared one row, and with it their routine and notes.
+     */
+    @Test
+    void aClassIdentityIsUniqueWithinAUniversityOnly() {
+        Long universityId = jdbc.queryForObject(
+                "SELECT id FROM universities WHERE domain = 'ustc.ac.bd'", Long.class);
+        jdbc.update("INSERT INTO student_classes (batch, department, section, university_id) "
+                + "VALUES ('Batch 99', 'DUPLICATE', 'Section A', ?)", universityId);
+
+        assertThatThrownBy(() -> jdbc.update(
+                "INSERT INTO student_classes (batch, department, section, university_id) "
+                        + "VALUES ('Batch 99', 'DUPLICATE', 'Section A', ?)", universityId))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+    }
+
+    /** A metadata row with no university appears in every tenant's dropdowns. */
+    @Test
+    void referenceDataAlwaysBelongsToAUniversity() {
+        assertThat(isNullable("system_metadata", "university_id")).isEqualToIgnoringCase("NO");
+
+        assertThatThrownBy(() -> jdbc.update(
+                "INSERT INTO system_metadata (type, meta_value, university_id) "
+                        + "VALUES ('NOT_A_REAL_TYPE', 'x', 1)"))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+    }
+
+    private String isNullable(String table, String column) {
+        return jdbc.queryForObject(
+                "SELECT is_nullable FROM information_schema.columns "
+                        + "WHERE UPPER(table_name) = UPPER(?) AND UPPER(column_name) = UPPER(?)",
+                String.class, table, column);
     }
 
     /** V2 provides the single university and the signup dropdown values. */

@@ -2,8 +2,16 @@
 
 export type Role = 'STUDENT' | 'CR' | 'TEACHER' | 'ADMIN' | 'SYSTEM_ADMIN'
 
+/** Which university a signed-in account belongs to. Null for a platform owner. */
+export type UserUniversity = {
+  slug: string
+  name: string
+  logoUrl: string | null
+}
+
 export type CurrentUser = {
   id: number
+  /** Generated from the email address, never typed. Email is the credential. */
   username: string
   fullName: string
   email: string
@@ -15,6 +23,38 @@ export type CurrentUser = {
   section: string | null
   designation: string | null
   profilePicUrl: string | null
+  approved: boolean
+  university: UserUniversity | null
+}
+
+/** A university as the public homepage lists it. */
+export type UniversitySummary = {
+  slug: string
+  name: string
+  logoUrl: string | null
+  shortDescription: string | null
+}
+
+/** A university's public page. */
+export type UniversityProfile = {
+  slug: string
+  name: string
+  description: string | null
+  contactEmail: string | null
+  contactPhone: string | null
+  website: string | null
+  address: string | null
+  logoUrl: string | null
+  departments: string[]
+}
+
+/** LearnX's own branding, shown above every tenant. */
+export type PlatformBranding = {
+  siteName: string
+  tagline: string | null
+  logoUrl: string | null
+  iconUrl: string | null
+  supportEmail: string | null
 }
 
 export type RoutineItem = {

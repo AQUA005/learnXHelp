@@ -58,21 +58,30 @@ class AuthorizationMatrixTest {
      */
     @org.junit.jupiter.api.BeforeEach
     void seedAccounts() {
-        if (userRepository.findByUsername("teacher").isPresent()) {
-            return;
-        }
         var university = universityRepository.findAll().stream().findFirst().orElseThrow();
-        var studentClass = studentClassRepository.save(com.ustc.learnx.entity.StudentClass.builder()
-                .batch("Batch 21").department("CSE").section("Section A")
-                .university(university).build());
+        var studentClass = studentClassRepository
+                .findByUniversityAndBatchAndDepartmentAndSection(
+                        university, "Batch 21", "MATRIX", "Section A")
+                .orElseGet(() -> studentClassRepository.save(com.ustc.learnx.entity.StudentClass.builder()
+                        .batch("Batch 21").department("MATRIX").section("Section A")
+                        .university(university).build()));
 
-        record Account(String username, com.ustc.learnx.entity.User.Role role, boolean inClass) {
+        /** {@code inUniversity} is false for the platform owner, who belongs to none. */
+        record Account(String username, com.ustc.learnx.entity.User.Role role,
+                       boolean inClass, boolean inUniversity) {
         }
+        // Checked one at a time rather than behind a single early return on
+        // "teacher exists". The suite shares a warm database, so a guard on one
+        // account would silently skip creating any account added later.
         for (Account account : List.of(
-                new Account("student", com.ustc.learnx.entity.User.Role.STUDENT, true),
-                new Account("cr", com.ustc.learnx.entity.User.Role.CR, true),
-                new Account("teacher", com.ustc.learnx.entity.User.Role.TEACHER, false),
-                new Account("admin", com.ustc.learnx.entity.User.Role.ADMIN, false))) {
+                new Account("student", com.ustc.learnx.entity.User.Role.STUDENT, true, true),
+                new Account("cr", com.ustc.learnx.entity.User.Role.CR, true, true),
+                new Account("teacher", com.ustc.learnx.entity.User.Role.TEACHER, false, true),
+                new Account("admin", com.ustc.learnx.entity.User.Role.ADMIN, false, true),
+                new Account("master", com.ustc.learnx.entity.User.Role.SYSTEM_ADMIN, false, false))) {
+            if (userRepository.findByUsername(account.username()).isPresent()) {
+                continue;
+            }
             userRepository.save(com.ustc.learnx.entity.User.builder()
                     .username(account.username())
                     .password("irrelevant")
@@ -81,7 +90,7 @@ class AuthorizationMatrixTest {
                     .role(account.role())
                     .approved(true)
                     .studentClass(account.inClass() ? studentClass : null)
-                    .university(university)
+                    .university(account.inUniversity() ? university : null)
                     .build());
         }
     }
@@ -101,6 +110,7 @@ class AuthorizationMatrixTest {
             "DELETE, /api/admin/reject/1",
             "GET,    /api/admin/teachers",
             "GET,    /api/admin/students",
+            "GET,    /api/admin/classes/1",
             "GET,    /api/admin/users",
             "POST,   /api/admin/users/1/reset-password",
             "GET,    /api/master/universities",
@@ -140,10 +150,56 @@ class AuthorizationMatrixTest {
         mvc.perform(request(method, path)).andExpect(status().isForbidden());
     }
 
-    @ParameterizedTest(name = "public asset {0} is served")
-    @CsvSource({"/", "/index.html"})
+    /**
+     * A refresh or a shared link on any client-side route must return the shell,
+     * signed in or not. These paths are served by one pattern rather than a
+     * hand-kept list, so a new screen needs no entry here — but a change to that
+     * pattern that stopped covering them would fail the build instead of showing
+     * up as an unexplained 401 after a refresh.
+     */
+    @ParameterizedTest(name = "public route {0} is served")
+    @CsvSource({
+            "/", "/index.html",
+            "/signin", "/signup", "/recover",
+            "/u/ustc-ac-bd",
+            "/schedule", "/exams/12",
+            "/admin/classes/1",
+            "/platform/universities/1"
+    })
     void publicAssetsRemainReachable(String path) throws Exception {
         mvc.perform(get(path)).andExpect(status().isOk());
+    }
+
+    /** The console is not a client route, whatever the shell pattern permits. */
+    @Test
+    void theDatabaseConsoleIsNotTreatedAsAClientRoute() throws Exception {
+        mvc.perform(get("/h2-console/").with(csrf()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * The public homepage's own data. These are the only unauthenticated reads
+     * in the application, and none of them is scoped to a caller.
+     */
+    @ParameterizedTest(name = "anonymous may read {0}")
+    @CsvSource({
+            "/api/public/branding",
+            "/api/public/universities",
+            "/api/public/universities/ustc-ac-bd",
+            "/api/public/universities/ustc-ac-bd/metadata?type=DEPARTMENT"
+    })
+    void thePublicSiteIsReadableWithoutASession(String path) throws Exception {
+        mvc.perform(get(path)).andExpect(status().isOk());
+    }
+
+    /**
+     * An unpublished university must answer exactly as a nonexistent one, or the
+     * platform owner's publish toggle leaks the name of every draft tenant.
+     */
+    @Test
+    void anUnlistedUniversityIsIndistinguishableFromNoneAtAll() throws Exception {
+        mvc.perform(get("/api/public/universities/no-such-place"))
+                .andExpect(status().isNotFound());
     }
 
     // -----------------------------------------------------------------
@@ -204,6 +260,7 @@ class AuthorizationMatrixTest {
     @CsvSource({
             "GET, /api/admin/pending",
             "GET, /api/admin/teachers",
+            "GET, /api/admin/classes/1",
             "GET, /api/admin/users",
             "POST, /api/admin/users/1/reset-password",
             "GET, /api/master/users/emails",
@@ -225,6 +282,21 @@ class AuthorizationMatrixTest {
     void adminIsDeniedPlatformEndpoints(String method, String path) throws Exception {
         mvc.perform(request(method, path).with(user("admin").roles("ADMIN")).with(csrf()))
                 .andExpect(status().isForbidden());
+    }
+
+    /**
+     * The other half of that rule. Without this, a platform console locked away
+     * from everybody — including its owner — would pass the case above.
+     */
+    @ParameterizedTest(name = "master reaches {0} {1}")
+    @CsvSource({
+            "GET, /api/master/universities",
+            "GET, /api/master/bugs",
+            "GET, /api/master/users/emails"
+    })
+    void masterReachesPlatformEndpoints(String method, String path) throws Exception {
+        mvc.perform(request(method, path).with(user("master").roles("SYSTEM_ADMIN")).with(csrf()))
+                .andExpect(status().isOk());
     }
 
     /**

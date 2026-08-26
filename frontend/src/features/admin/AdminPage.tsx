@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { useToast } from '@/lib/toast'
 import { formatDateTime } from '@/lib/format'
@@ -129,7 +130,6 @@ function Approvals() {
   )
 }
 
-
 type Person = {
   id: number
   username: string
@@ -148,7 +148,7 @@ type Person = {
 function People() {
   const { notify, reportError } = useToast()
   const [search, setSearch] = useState('')
-  const [issued, setIssued] = useState<{ username: string; password: string } | null>(null)
+  const [issued, setIssued] = useState<{ email: string; password: string } | null>(null)
 
   const people = useQuery({
     queryKey: ['people'],
@@ -157,12 +157,12 @@ function People() {
 
   const reset = useMutation({
     mutationFn: (id: number) =>
-      api.post<{ message: string; username: string; password: string }>(
+      api.post<{ message: string; email: string; password: string }>(
         `/api/admin/users/${id}/reset-password`,
         {},
       ),
     onSuccess: (result) => {
-      setIssued({ username: result.username, password: result.password })
+      setIssued({ email: result.email, password: result.password })
       notify(result.message, 'success')
     },
     onError: (error) => reportError(error),
@@ -182,8 +182,8 @@ function People() {
       {issued && (
         <Card title="New password">
           <Alert kind="success">
-            Give this to <strong>{issued.username}</strong> and ask them to change it once they
-            have signed in. It is shown only now and cannot be looked up again.
+            Give this to <strong>{issued.email}</strong> — the address they sign in with — and
+            ask them to change it once they have signed in. It is shown only now and cannot be looked up again.
           </Alert>
           <p className="mono" style={{ fontSize: '1.3rem', letterSpacing: '0.05em', margin: 0 }}>
             {issued.password}
@@ -259,42 +259,38 @@ function People() {
     </>
   )
 }
+
+/**
+ * A class group as `/api/admin/classes` lists it.
+ *
+ * `className` and the representative fields are genuinely present now. The
+ * server used to omit `className` entirely — so the Class column rendered
+ * blank — and sent the string "None Assigned" rather than null for an
+ * unassigned representative, so the fallback below never showed.
+ */
 type ClassGroup = {
   id: number
   className: string
   batch: string
   department: string
   section: string
-  studentsCount?: number
-  crUsername?: string | null
+  semester: string
+  studentsCount: number
+  crUsername: string | null
+  crFullName: string | null
 }
 
+/**
+ * The class groups, as a way in rather than a place to act.
+ *
+ * Promotion and rollback used to sit on each row here, one click away and with
+ * nothing to say which class was about to move. They live on the class's own
+ * screen now, next to the roster they affect.
+ */
 function Classes() {
-  const queryClient = useQueryClient()
-  const { notify, reportError } = useToast()
-
   const classes = useQuery({
     queryKey: ['classes'],
     queryFn: () => api.get<ClassGroup[]>('/api/admin/classes'),
-  })
-
-  const promote = useMutation({
-    mutationFn: (id: number) => api.post<{ message: string }>(`/api/admin/classes/${id}/promote`),
-    onSuccess: (result) => {
-      notify(result.message, 'success')
-      void queryClient.invalidateQueries({ queryKey: ['classes'] })
-    },
-    onError: (error) => reportError(error),
-  })
-
-  const rollback = useMutation({
-    mutationFn: (id: number) =>
-      api.post<{ message: string }>(`/api/admin/classes/${id}/rollback-promotion`),
-    onSuccess: (result) => {
-      notify(result.message, 'success')
-      void queryClient.invalidateQueries({ queryKey: ['classes'] })
-    },
-    onError: (error) => reportError(error),
   })
 
   const items = classes.data ?? []
@@ -319,26 +315,15 @@ function Classes() {
             <tbody>
               {items.map((group) => (
                 <tr key={group.id}>
-                  <td>{group.className}</td>
-                  <td className="mono">{group.studentsCount ?? 0}</td>
-                  <td>{group.crUsername ?? <span className="muted">none</span>}</td>
                   <td>
-                    <div className="row">
-                      <button
-                        className="btn btn-sm"
-                        onClick={() => promote.mutate(group.id)}
-                        disabled={promote.isPending}
-                      >
-                        Promote a semester
-                      </button>
-                      <button
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => rollback.mutate(group.id)}
-                        disabled={rollback.isPending}
-                      >
-                        Undo
-                      </button>
-                    </div>
+                    <Link to={`/admin/classes/${group.id}`}>{group.className}</Link>
+                  </td>
+                  <td className="mono">{group.studentsCount ?? 0}</td>
+                  <td>{group.crFullName ?? <span className="muted">none</span>}</td>
+                  <td>
+                    <Link className="btn btn-secondary btn-sm" to={`/admin/classes/${group.id}`}>
+                      Open
+                    </Link>
                   </td>
                 </tr>
               ))}

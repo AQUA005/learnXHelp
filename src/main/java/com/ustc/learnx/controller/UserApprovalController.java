@@ -2,6 +2,7 @@ package com.ustc.learnx.controller;
 
 import com.ustc.learnx.entity.User;
 import com.ustc.learnx.entity.User.Role;
+import com.ustc.learnx.entity.University;
 import com.ustc.learnx.entity.StudentClass;
 import com.ustc.learnx.entity.ProfileChangeRequest;
 import com.ustc.learnx.repository.UserRepository;
@@ -34,6 +35,7 @@ public class UserApprovalController {
     private final org.springframework.mail.javamail.JavaMailSender mailSender;
     private final org.springframework.core.env.Environment env;
     private final com.ustc.learnx.service.CurrentUserService currentUserService;
+    private final com.ustc.learnx.service.ClassPlacementService classPlacementService;
 
     @GetMapping("/pending")
     public ResponseEntity<?> getPendingUsers(Principal principal) {
@@ -127,24 +129,10 @@ public class UserApprovalController {
                     .body(Map.of("error", "You do not have permission to approve a user with role: " + targetRole));
         }
 
-        // Auto-group Student/CR into a StudentClass
-        if (targetRole == Role.STUDENT || targetRole == Role.CR) {
-            String batch = targetUser.getBatch();
-            String dept = targetUser.getDepartment();
-            String sec = targetUser.getSection();
-            if (batch != null && dept != null && sec != null && !batch.isEmpty() && !dept.isEmpty() && !sec.isEmpty()) {
-                StudentClass studentClass = studentClassRepository.findByBatchAndDepartmentAndSection(batch, dept, sec)
-                        .orElseGet(() -> {
-                            StudentClass sc = StudentClass.builder()
-                                    .batch(batch)
-                                    .department(dept)
-                                    .section(sec)
-                                    .build();
-                            return studentClassRepository.save(sc);
-                        });
-                targetUser.setStudentClass(studentClass);
-            }
-        }
+        // Puts a student in the class their details describe. Everything scoped
+        // to a class — the routine, notes, announcements, class tests — is empty
+        // for an account that has none.
+        classPlacementService.place(targetUser);
 
         targetUser.setApproved(true);
         userRepository.save(targetUser);
@@ -159,7 +147,7 @@ public class UserApprovalController {
             message.setSubject("LearnX Account Approved");
             message.setText("Hello " + targetUser.getFullName() + ",\n\n"
                     + "Your LearnX account request has been approved!\n"
-                    + "You can now log in using your registered username: " + targetUser.getUsername() + "\n\n"
+                    + "You can now sign in with your email address: " + targetUser.getEmail() + "\n\n"
                     + "Best regards,\n"
                     + "LearnX Team");
             mailSender.send(message);
@@ -270,6 +258,9 @@ public class UserApprovalController {
                 .email(request.getEmail())
                 .role(Role.ADMIN)
                 .approved(true)
+                // Without this the new administrator belongs to no university,
+                // so every tenant-scoped screen they open answers 403.
+                .university(currentUser.getUniversity())
                 .build();
 
         userRepository.save(admin);
@@ -324,16 +315,7 @@ public class UserApprovalController {
             String dept = targetUser.getDepartment();
             String sec = targetUser.getSection();
             if (batch != null && dept != null && sec != null && !batch.isEmpty() && !dept.isEmpty() && !sec.isEmpty()) {
-                StudentClass studentClass = studentClassRepository.findByBatchAndDepartmentAndSection(batch, dept, sec)
-                        .orElseGet(() -> {
-                            StudentClass sc = StudentClass.builder()
-                                    .batch(batch)
-                                    .department(dept)
-                                    .section(sec)
-                                    .build();
-                            return studentClassRepository.save(sc);
-                        });
-                targetUser.setStudentClass(studentClass);
+                classPlacementService.place(targetUser);
             }
         }
 

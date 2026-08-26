@@ -45,8 +45,12 @@ class PromotionServiceTest {
     @BeforeEach
     void setUp() {
         university = universityRepository.findAll().stream().findFirst().orElseThrow();
+        // A fixture identity of this class's own. The suite shares one in-memory
+        // database and (university, batch, department, section) is unique, so
+        // reusing another test's values makes the outcome depend on which ran
+        // first.
         studentClass = studentClassRepository.save(StudentClass.builder()
-                .batch("Batch 21").department("CSE").section("Section A")
+                .batch("Batch 21").department("PROMOTION").section("Section A")
                 .university(university).build());
     }
 

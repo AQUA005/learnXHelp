@@ -31,6 +31,11 @@ public class ApiExceptionHandler {
         return problem(HttpStatus.FORBIDDEN, ex.getMessage());
     }
 
+    @ExceptionHandler(UnauthorizedException.class)
+    public ProblemDetail handleUnauthorized(UnauthorizedException ex) {
+        return problem(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    }
+
     /** Thrown by {@code @PreAuthorize} when the caller lacks the required role. */
     @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
     public ProblemDetail handleSpringAccessDenied(org.springframework.security.access.AccessDeniedException ex) {

@@ -11,22 +11,50 @@ import { expect, test } from '@playwright/test'
  * text alone made the outcome depend on how quickly the server replied.
  */
 
-async function signIn(page: import('@playwright/test').Page, username: string) {
-  await page.goto('/')
-  await page.getByLabel('Username').fill(username)
+/**
+ * Signs in with an email address. `/` is the public homepage now, so the form
+ * lives at its own route rather than standing in for the whole application.
+ */
+async function signIn(page: import('@playwright/test').Page, email: string) {
+  await page.goto('/signin')
+  await page.getByLabel('Email').fill(email)
   await page.getByLabel('Password').fill('password')
-  // Scoped to the form: the tab that selects this panel carries the same name.
+  // Scoped to the form: the header link to this page carries the same name.
   await page.locator('form').getByRole('button', { name: 'Sign in' }).click()
   await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible()
 }
 
 async function signOut(page: import('@playwright/test').Page) {
   await page.getByRole('button', { name: 'Sign out' }).click()
-  await expect(page.locator('form').getByRole('button', { name: 'Sign in' })).toBeVisible()
+  // Signing out lands on the public homepage.
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Dashboard' })).toHaveCount(0)
 }
 
+test('a visitor sees the universities and can reach one of them', async ({ page }) => {
+  await page.goto('/')
+
+  // The seeded university is published, so the homepage is never empty.
+  const university = page.getByRole('link', { name: /University of Science and Technology/ })
+  await expect(university).toBeVisible()
+
+  await university.click()
+  await expect(page.getByRole('heading', { level: 1, name: /University of Science and Technology/ }))
+    .toBeVisible()
+
+  // And from there into a signup scoped to that university.
+  await page.getByRole('link', { name: 'Create an account' }).click()
+  await expect(page).toHaveURL(/university=ustc-ac-bd/)
+  await expect(page.getByLabel('Email')).toBeVisible()
+})
+
+test('an unlisted university is not found', async ({ page }) => {
+  await page.goto('/u/no-such-place')
+  await expect(page.getByRole('heading', { name: /isn't listed/ })).toBeVisible()
+})
+
 test('a student can sign in and reach every screen', async ({ page }) => {
-  await signIn(page, 'student')
+  await signIn(page, 'student@learnx.help')
 
   // The dashboard greets them and shows the day's summary.
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Good')
@@ -47,7 +75,7 @@ test('a student can sign in and reach every screen', async ({ page }) => {
 })
 
 test('a student can sit an exam and see the result recorded', async ({ page }) => {
-  await signIn(page, 'student')
+  await signIn(page, 'student@learnx.help')
 
   await page.getByRole('link', { name: 'Exams', exact: true }).click()
   // The page heading, addressed by level so a card title can never collide.
@@ -89,7 +117,7 @@ test('a student can sit an exam and see the result recorded', async ({ page }) =
 })
 
 test('a student cannot reach the administration screens', async ({ page }) => {
-  await signIn(page, 'student')
+  await signIn(page, 'student@learnx.help')
 
   await expect(page.getByRole('link', { name: 'Administration' })).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'Gradebook' })).toHaveCount(0)
@@ -100,11 +128,38 @@ test('a student cannot reach the administration screens', async ({ page }) => {
 })
 
 test('an administrator sees the administration screens', async ({ page }) => {
-  await signIn(page, 'admin')
+  await signIn(page, 'admin@learnx.help')
 
-  await page.getByRole('link', { name: 'Administration' }).click()
+  // Their dashboard is the administrator's, not the student's.
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Good')
+  await expect(page.getByText('Awaiting approval')).toBeVisible()
+
+  // Scoped to the sidebar: the dashboard also links to this screen.
+  await page.getByLabel('Sections').getByRole('link', { name: 'Administration' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Administration' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Account approvals' })).toBeVisible()
+
+  // The class list is a way into each class rather than a place to act on it.
+  await page.getByRole('button', { name: 'Classes' }).click()
+  await page.getByRole('link', { name: 'Open' }).first().click()
+  await expect(page.getByRole('button', { name: 'Roster' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Courses & teachers' })).toBeVisible()
+})
+
+test('the platform owner sees the platform, not a class', async ({ page }) => {
+  await signIn(page, 'master@learnx.com')
+
+  // A platform owner belongs to no university, so the class-scoped screens are
+  // not offered to them at all.
+  await expect(page.getByLabel('Sections').getByRole('link', { name: 'Class routine' }))
+    .toHaveCount(0)
+  await expect(page.getByLabel('Sections').getByRole('link', { name: 'My results' }))
+    .toHaveCount(0)
+
+  await page.getByLabel('Sections').getByRole('link', { name: 'Platform' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Platform' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Universities' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Site branding' })).toBeVisible()
 })
 
 test('the health probe answers without a session', async ({ request }) => {
