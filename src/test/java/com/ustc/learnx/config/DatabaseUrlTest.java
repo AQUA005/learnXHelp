@@ -73,6 +73,30 @@ class DatabaseUrlTest {
         assertThat(settings.orElseThrow().password()).isEqualTo("ab+cd+ef");
     }
 
+    /**
+     * A value pasted from a dashboard often arrives wrapped in the quotes of a
+     * psql example, or with a newline on the end. Left in place none of it is a
+     * URL, and the application would quietly start on its local H2 fallback.
+     */
+    @Test
+    void ignoresQuotesAndWhitespaceAroundTheUrl() {
+        Optional<JdbcSettings> settings = DatabaseUrl.from(Map.of(
+                "DATABASE_URL", "  'postgresql://user:pass@host.example.com/db?sslmode=require'\n"));
+
+        assertThat(settings.orElseThrow().url())
+                .isEqualTo("jdbc:postgresql://host.example.com:5432/db?sslmode=require");
+        assertThat(settings.orElseThrow().username()).isEqualTo("user");
+        assertThat(settings.orElseThrow().password()).isEqualTo("pass");
+    }
+
+    /** Told apart so a deployment can refuse to start on the H2 fallback. */
+    @Test
+    void reportsWhetherADatabaseUrlWasPublished() {
+        assertThat(DatabaseUrl.isPublished(Map.of("DATABASE_URL", "not a url at all"))).isTrue();
+        assertThat(DatabaseUrl.isPublished(Map.of("DATABASE_URL", "  "))).isFalse();
+        assertThat(DatabaseUrl.isPublished(Map.of())).isFalse();
+    }
+
     /** Nor may a percent-escape be resolved twice. */
     @Test
     void doesNotDecodeAPasswordTwice() {

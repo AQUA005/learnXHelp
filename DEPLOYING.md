@@ -108,6 +108,19 @@ offers you a choice — the host contains `-pooler`. Keep `?sslmode=require`
 exactly as given; it is what encrypts the connection, and it is carried through
 untouched.
 
+Two things to watch when you copy it:
+
+- **Reveal the password first.** Neon shows it hidden by default, and a string
+  copied while it is hidden carries the dots rather than the password. The
+  result is `password authentication failed` on the next deploy.
+- Neon may append `&channel_binding=require`. Leaving it costs nothing — the
+  Java driver ignores connection parameters it does not recognise — and so does
+  removing it.
+
+Neon shows the password once. If you lose it, reset it in the Neon dashboard and
+paste the **new** string into Render; the old one stops working the moment you
+reset.
+
 Then continue from [Step 3](#step-3--point-the-application-at-the-database) and
 skip step 2, since you already have a database.
 
@@ -432,7 +445,8 @@ Open **Logs** on the web service and look for the first line containing `ERROR`.
 | What you see | What it means | Fix |
 |---|---|---|
 | `The connection attempt failed` / `UnknownHost` | Cannot reach the database | Check `DATABASE_URL`. Use the **Internal** URL, and put the database in the same region as the service |
-| `password authentication failed` | Wrong credentials | Re-copy the Internal Database URL; it changes if you recreate the database |
+| `password authentication failed` | The host was reached; only the credentials are wrong | Copy the connection string again, with the password **revealed** — a dashboard that masks it copies the dots. Take the whole string in one piece. Any password reset, or recreating the database, invalidates the old one |
+| `DATABASE_URL is set but could not be read as a database URL` | The value is not a URL | Usually quotes around it, or a string cut short at a line break. It must be one line, starting `postgresql://` |
 | `SSL connection is required` or `no pg_hba.conf entry` | The provider requires TLS | Keep `?sslmode=require` on the end of `DATABASE_URL`; do not trim it |
 | First request after a quiet period is slow, then fine | A serverless database waking up | Normal on a free tier. Nothing to fix |
 | `too many clients already` | The pool is larger than the free tier allows | Set `DB_POOL_SIZE` to `3` and redeploy |
