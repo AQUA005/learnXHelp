@@ -181,8 +181,24 @@ To enable it, add:
 |---|---|
 | `SPRING_MAIL_HOST` | Your provider's SMTP host |
 | `SPRING_MAIL_PORT` | `587` |
-| `SPRING_MAIL_USERNAME` | The mailbox address |
-| `SPRING_MAIL_PASSWORD` | An **app password**, not your normal login password |
+| `SPRING_MAIL_USERNAME` | Whatever the provider tells you to log in with |
+| `SPRING_MAIL_PASSWORD` | An **app password** or **SMTP key**, not your normal login password |
+| `LEARNX_MAIL_FROM` | The address recipients should see. Optional — see below |
+
+There are two kinds of provider and they differ in one respect.
+
+With a **mailbox provider** (Migadu, Zoho, Namecheap Private Email, Gmail) the
+username is itself an address, so leave `LEARNX_MAIL_FROM` unset and mail is
+sent from the username.
+
+With a **transactional relay** (Brevo, Resend, SMTP2GO) the username is an API
+key or an account login instead. Set `LEARNX_MAIL_FROM` to the address you want
+on the From line, otherwise recipients see the API key and most mail servers
+reject the message.
+
+Either way the sending domain needs SPF and DKIM DNS records, which the
+provider gives you when you verify the domain. Without them password-recovery
+mail is filed as spam.
 
 With Gmail you must turn on 2-step verification and create an App Password;
 Gmail rejects your ordinary password. Deliberately, an unreachable mail server
