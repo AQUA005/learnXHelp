@@ -294,6 +294,18 @@ in Render under **Environment**:
 | `SPRING_MAIL_PORT` | `587` |
 | `SPRING_MAIL_USERNAME` | The username they give you |
 | `SPRING_MAIL_PASSWORD` | The password or API key they give you |
+| `LEARNX_MAIL_FROM` | The address recipients should see — see below |
+
+Providers come in two kinds, and they differ in one respect.
+
+A **mailbox provider** (Zoho, Gmail, Namecheap Private Email) logs you in with
+an address, so leave `LEARNX_MAIL_FROM` unset and mail is sent from the
+username.
+
+A **relay** (Brevo, Resend, Mailjet, SES) logs you in with an API key or your
+account's own address instead. Set `LEARNX_MAIL_FROM` to the address you want
+on the From line — something like `noreply@yourdomain.com`. Without it the
+login value ends up on the From line, and the message is rejected.
 
 With Gmail specifically, turn on 2-step verification and create an **App
 Password**. Gmail rejects your ordinary password.

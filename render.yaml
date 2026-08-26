@@ -58,6 +58,10 @@ services:
         sync: false
       - key: SPRING_MAIL_PASSWORD
         sync: false
+      # Only needed when the SMTP username is not itself a mailbox address,
+      # which is the case for relays such as Brevo, Resend or SMTP2GO.
+      - key: LEARNX_MAIL_FROM
+        sync: false
 
     # Without a disk the container's filesystem is replaced on every deploy and
     # every uploaded file is lost. A disk requires a paid instance type; if you

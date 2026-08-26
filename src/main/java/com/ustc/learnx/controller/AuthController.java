@@ -198,7 +198,7 @@ public class AuthController {
 
         try {
             org.springframework.mail.SimpleMailMessage message = new org.springframework.mail.SimpleMailMessage();
-            String fromEmail = env.getProperty("spring.mail.username");
+            String fromEmail = env.getProperty("learnx.mail.from");
             if (fromEmail != null && !fromEmail.isEmpty()) {
                 message.setFrom(fromEmail);
             }
