@@ -54,6 +54,10 @@ services:
         sync: false
       - key: SPRING_MAIL_PORT
         value: "587"
+      # Must be an address verified with the mail provider. A relay will not
+      # send from its own SMTP username.
+      - key: LEARNX_MAIL_FROM
+        sync: false
       - key: SPRING_MAIL_USERNAME
         sync: false
       - key: SPRING_MAIL_PASSWORD

@@ -9,12 +9,8 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -34,12 +30,12 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class EmailController {
 
-    private static final Logger log = LoggerFactory.getLogger(EmailController.class);
-
-    private final JavaMailSender mailSender;
-    private final Environment env;
+    private final com.ustc.learnx.service.MailService mailService;
     private final UserRepository userRepository;
     private final CurrentUserService currentUserService;
+
+    @org.springframework.beans.factory.annotation.Value("${spring.mail.host:}")
+    private String host;
 
     public record SendMailRequest(
             @NotBlank(message = "Recipient is required")
@@ -67,25 +63,65 @@ public class EmailController {
                         "That address does not belong to a registered member of this university"));
         currentUserService.assertSameUniversity(recipient.getUniversity());
 
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            String fromEmail = env.getProperty("spring.mail.username");
-            if (fromEmail != null && !fromEmail.isEmpty()) {
-                message.setFrom(fromEmail);
-            }
-            message.setTo(recipient.getEmail());
-            message.setSubject(request.subject());
-            message.setText(request.body()
-                    + "\n\n---\nSent by: " + sender.getFullName() + " via LearnX");
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(recipient.getEmail());
+        message.setSubject(request.subject());
+        message.setText(request.body()
+                + "\n\n---\nSent by: " + sender.getFullName() + " via LearnX");
 
-            mailSender.send(message);
-            return ResponseEntity.ok(Map.of("message", "Email sent successfully!"));
-        } catch (Exception e) {
-            // The underlying failure can name the mail host and credentials.
-            log.error("Failed to send mail to user id {}", recipient.getId(), e);
-            return ResponseEntity.status(502)
-                    .body(Map.of("message", "The message could not be delivered. Please try again later."));
+        // MailService logs and audits the reason. It is not returned here,
+        // because it can name the mail host and the credentials.
+        if (!mailService.send(message)) {
+            return ResponseEntity.status(502).body(Map.of(
+                    "message", "The message could not be delivered. Check the mail settings."));
         }
+        return ResponseEntity.ok(Map.of("message", "Email sent successfully!"));
+    }
+
+    public record MailStatusResponse(boolean configured, String from, String host) {
+    }
+
+    /** Whether mail is set up, so the administrator can see it before relying on it. */
+    @GetMapping("/status")
+    public ResponseEntity<MailStatusResponse> status() {
+        return ResponseEntity.ok(new MailStatusResponse(
+                mailService.isConfigured(), mailService.from(), host));
+    }
+
+    /**
+     * Sends a message to the administrator asking for it.
+     *
+     * <p>Mail configuration goes wrong quietly: a relay that will not send from
+     * the configured address, or a domain missing its SPF and DKIM records,
+     * both look like everything working until somebody needs a recovery code.
+     * This proves it end to end, and returns the mail server's own words when it
+     * does not.
+     */
+    @PostMapping("/test")
+    public ResponseEntity<?> sendTest() {
+        User admin = currentUserService.requireCurrentUser();
+        if (admin.getEmail() == null || admin.getEmail().isBlank()) {
+            throw new ValidationException("Your account has no email address to send to");
+        }
+
+        String failure = mailService.sendAndDescribeFailure(
+                admin.getEmail(),
+                "LearnX test message",
+                "This is a test from LearnX.\n\n"
+                        + "If you are reading it, sign-up notices and password recovery will "
+                        + "reach your students.\n\n"
+                        + "Check that it did not land in spam. If it did, add the SPF and DKIM "
+                        + "records your mail provider gives you to the domain this was sent "
+                        + "from.\n");
+
+        if (failure != null) {
+            return ResponseEntity.status(502).body(Map.of(
+                    "message", "The message could not be sent.",
+                    "reason", failure));
+        }
+        return ResponseEntity.ok(Map.of(
+                "message", "Sent to " + admin.getEmail()
+                        + ". If it does not arrive, check the spam folder."));
     }
 
     /** Addresses this administrator may write to. */

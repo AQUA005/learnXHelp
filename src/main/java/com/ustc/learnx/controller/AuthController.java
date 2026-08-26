@@ -32,8 +32,7 @@ public class AuthController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final UniversityRepository universityRepository;
-    private final org.springframework.mail.javamail.JavaMailSender mailSender;
-    private final org.springframework.core.env.Environment env;
+    private final com.ustc.learnx.service.MailService mailService;
 
     @Data
     @NoArgsConstructor
@@ -196,24 +195,14 @@ public class AuthController {
 
         userRepository.save(user);
 
-        try {
-            org.springframework.mail.SimpleMailMessage message = new org.springframework.mail.SimpleMailMessage();
-            String fromEmail = env.getProperty("spring.mail.username");
-            if (fromEmail != null && !fromEmail.isEmpty()) {
-                message.setFrom(fromEmail);
-            }
-            message.setTo(user.getEmail());
-            message.setSubject("LearnX Registration Under Review");
-            message.setText("Hello " + user.getFullName() + ",\n\n"
+        // A failure here is recorded but does not fail the sign-up: the account
+        // exists and an administrator can approve it regardless.
+        mailService.send(user.getEmail(), "LearnX Registration Under Review", "Hello " + user.getFullName() + ",\n\n"
                     + "Thank you for registering on LearnX.\n"
                     + "Your account request is currently pending administrator approval.\n"
                     + "You will receive another email once your account has been approved.\n\n"
                     + "Best regards,\n"
                     + "LearnX Team");
-            mailSender.send(message);
-        } catch (Exception ex) {
-            System.err.println("Failed to send signup email to " + user.getEmail() + ": " + ex.getMessage());
-        }
 
         return ResponseEntity.ok(Map.of("message", "Your form is under progress. You will be notified via email once approved."));
     }

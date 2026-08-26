@@ -9,8 +9,6 @@ import lombok.NoArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -50,8 +48,7 @@ public class PasswordRecoveryController {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JavaMailSender mailSender;
-    private final org.springframework.core.env.Environment env;
+    private final com.ustc.learnx.service.MailService mailService;
 
     /** A code hash plus its expiry and remaining guesses. */
     private record PendingReset(String codeHash, Instant expiresAt, int attemptsLeft) {
@@ -163,27 +160,16 @@ public class PasswordRecoveryController {
     }
 
     private void sendCode(User user, String code) {
-        try {
-            SimpleMailMessage mailMessage = new SimpleMailMessage();
-            String fromEmail = env.getProperty("spring.mail.username");
-            if (fromEmail != null && !fromEmail.isEmpty()) {
-                mailMessage.setFrom(fromEmail);
-            }
-            mailMessage.setTo(user.getEmail());
-            mailMessage.setSubject("LearnX Password Recovery Verification Code");
-            mailMessage.setText("Hello,\n\n"
+        // The outcome is never surfaced to the caller, since that would reveal
+        // whether the account exists. MailService records the failure, where an
+        // administrator will see it.
+        mailService.send(user.getEmail(), "LearnX Password Recovery Verification Code", "Hello,\n\n"
                     + "You have requested to reset your password on LearnX.\n"
                     + "Your password recovery verification code is: " + code + "\n\n"
                     + "This code expires in " + CODE_TTL.toMinutes() + " minutes. "
                     + "If you did not make this request, you can ignore this email.\n\n"
                     + "Best regards,\n"
                     + "LearnX Team");
-            mailSender.send(mailMessage);
-        } catch (Exception e) {
-            // Never log the code itself, and never surface the failure to the
-            // caller, since that would reveal whether the account exists.
-            log.error("Failed to send recovery email for user id {}: {}", user.getId(), e.getMessage());
-        }
     }
 
     private static void purgeExpired() {

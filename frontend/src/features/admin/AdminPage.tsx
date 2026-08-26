@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api'
+import { ApiError, api } from '@/lib/api'
 import { useToast } from '@/lib/toast'
 import { formatDateTime } from '@/lib/format'
 import type { MetadataOption, PendingUser } from '@/lib/types'
 import { Alert, Badge, Card, EmptyState, Field, Loading, PageHeader } from '@/components/ui'
 
-type Tab = 'approvals' | 'people' | 'classes' | 'metadata' | 'audit'
+type Tab = 'approvals' | 'people' | 'classes' | 'metadata' | 'email' | 'audit'
 
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>('approvals')
@@ -17,6 +17,7 @@ export default function AdminPage() {
     { id: 'people', label: 'People' },
     { id: 'classes', label: 'Classes' },
     { id: 'metadata', label: 'Dropdown options' },
+    { id: 'email', label: 'Email' },
     { id: 'audit', label: 'Change history' },
   ]
 
@@ -40,6 +41,7 @@ export default function AdminPage() {
       {tab === 'people' && <People />}
       {tab === 'classes' && <Classes />}
       {tab === 'metadata' && <Metadata />}
+      {tab === 'email' && <EmailSettings />}
       {tab === 'audit' && <AuditTrail />}
     </>
   )
@@ -497,6 +499,82 @@ function AuditTrail() {
           </table>
         </div>
       )}
+    </Card>
+  )
+}
+
+type MailStatus = { configured: boolean; from: string; host: string }
+
+/**
+ * Whether email is working, and a way to prove it.
+ *
+ * Mail configuration fails quietly: a relay that will not send from the
+ * configured address, or a domain missing its SPF and DKIM records, both look
+ * exactly like everything working until somebody needs a recovery code and
+ * never gets one.
+ */
+function EmailSettings() {
+  const { notify } = useToast()
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null)
+
+  const status = useQuery({
+    queryKey: ['mail-status'],
+    queryFn: () => api.get<MailStatus>('/api/mail/status'),
+  })
+
+  const sendTest = useMutation({
+    mutationFn: () => api.post<{ message: string }>('/api/mail/test'),
+    onSuccess: (response) => {
+      setResult({ ok: true, text: response.message })
+      notify('Test message sent', 'success')
+    },
+    onError: (error) => {
+      const reason =
+        error instanceof ApiError && error.message ? error.message : 'The message could not be sent.'
+      setResult({ ok: false, text: reason })
+    },
+  })
+
+  return (
+    <Card title="Email">
+      {status.isLoading ? (
+        <Loading rows={2} />
+      ) : status.data?.configured ? (
+        <>
+          <Alert kind="success">
+            Email is configured. Messages are sent from <strong>{status.data.from}</strong> via{' '}
+            {status.data.host}.
+          </Alert>
+          <p className="small muted">
+            Sign-up notices and password recovery use this. Send a test to your own address to
+            confirm messages arrive and are not treated as spam.
+          </p>
+        </>
+      ) : (
+        <>
+          <Alert kind="error">Email is not configured, so password recovery will not work.</Alert>
+          <p className="small muted">
+            Set <code>SPRING_MAIL_HOST</code>, <code>SPRING_MAIL_USERNAME</code>,{' '}
+            <code>SPRING_MAIL_PASSWORD</code> and <code>LEARNX_MAIL_FROM</code> where the
+            application is hosted. Until then, reset passwords from the People tab instead.
+          </p>
+        </>
+      )}
+
+      {result && (
+        <Alert kind={result.ok ? 'success' : 'error'}>{result.text}</Alert>
+      )}
+
+      <button
+        className="btn"
+        onClick={() => {
+          setResult(null)
+          sendTest.mutate()
+        }}
+        disabled={sendTest.isPending}
+      >
+        {sendTest.isPending ? 'Sending…' : 'Send a test message to me'}
+      </button>
     </Card>
   )
 }

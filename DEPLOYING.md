@@ -155,6 +155,11 @@ Add these. **Add** > type the key > paste the value > **Save Changes**.
 | `LEARNX_ADMIN_USERNAME` | A username for yourself, for example `principal` |
 | `LEARNX_ADMIN_PASSWORD` | A strong password — at least 8 characters with a letter and a number |
 | `LEARNX_ADMIN_EMAIL` | Your email address |
+| `SPRING_MAIL_HOST` | Your mail provider's SMTP host, e.g. `smtp-relay.brevo.com` |
+| `SPRING_MAIL_PORT` | `587` |
+| `SPRING_MAIL_USERNAME` | The username your mail provider issues |
+| `SPRING_MAIL_PASSWORD` | The SMTP key or password |
+| `LEARNX_MAIL_FROM` | The verified address mail is sent from — see [Email](#email) |
 
 **About `DATABASE_URL`:**
 
@@ -241,73 +246,92 @@ As the administrator, open **Administration**:
   cannot sign in. Resetting a password here shows the new one once, for you to
   pass on. This works whether or not email is set up.
 - **Classes** — class groups, and promoting a cohort to the next semester.
+- **Email** — whether mail is set up, and a test message to prove it arrives.
 
 Then tell students to sign up, and approve them as they arrive.
 
 ---
 
-## Optional: sending email
+## Email
 
-Email is used for two things: telling someone their sign-up is being reviewed,
-and letting people reset their own password. **Everything else works without
-it** — sign-up, approval, routines, notes, announcements, exams and grades are
-all unaffected, and an unreachable mail server deliberately does not mark the
-service unhealthy, so it will never restart your site.
+Email is used for sign-up notices and password recovery. Set it up once and it
+looks after itself.
 
-The only thing you lose is self-service password recovery, and an administrator
-can reset anyone's password directly from **Administration > People**. So this
-is genuinely optional; set it up when convenient.
+A deliberate design point: **the site does not depend on it.** Sign-up,
+approval, routines, notes, announcements, exams and grades all work with the
+mail server down, and an unreachable mail server never marks the service
+unhealthy or restarts it. If a message cannot be sent, the failure is recorded
+in **Administration > Change history** rather than shown to the person signing
+up, and an administrator can always reset a password from **Administration >
+People**.
 
-### What you actually need
+### What you need
 
-The application only ever **sends**. It never receives, so a full mailbox is
-more than it requires. What it needs is a *transactional email* service: an SMTP
-host, a username and a password.
+The application only ever **sends**; it never receives. So it needs a
+*transactional email* service — an SMTP host, a username and a password — not a
+mailbox subscription. The two are priced very differently.
 
-That matters because a mailbox and a sending service are priced very
-differently. If your mailbox subscription lapsed, you do not have to renew it
-just to make password recovery work again.
+**Terms and free allowances change**, so check the provider's current pricing
+rather than trusting this list.
 
-**Terms and free allowances change** — check the provider's current pricing
-rather than trusting this table.
+| Service | Shape of the free tier |
+|---|---|
+| **Brevo** | A few hundred messages a day |
+| **Resend** | A few thousand a month |
+| **Mailjet** | A few thousand a month |
+| **Amazon SES** | Not free, but priced per thousand and very cheap |
+| **Zoho Mail** | Free tier if you also want a *mailbox* at your domain |
+| **Gmail** | Free, but sends from your personal address and needs an App Password |
 
-| Service | Shape of the free tier | Notes |
-|---|---|---|
-| **Brevo** | A few hundred messages a day | Straightforward SMTP credentials |
-| **Resend** | A few thousand a month | Simple to set up; SMTP as well as an API |
-| **Mailjet** | A few thousand a month | Long-standing SMTP provider |
-| **Amazon SES** | Not free, but priced per thousand and very cheap | Cheapest at volume; the most setup, and new accounts start restricted |
-| **Zoho Mail** | Free tier for a custom domain | Choose this if you also want a *mailbox* at your domain, not only sending |
-| **Gmail** | Free | Works, but sends from your personal address rather than your domain, and needs an App Password |
+For one university this is a handful of messages a day — inside every free tier.
 
-For a single university this is well inside every free tier: a handful of
-messages a day at most.
-
-### Setting it up
-
-Whichever you choose, they give you a host, a username and a password. Put them
-in Render under **Environment**:
+### Settings
 
 | Key | Value |
 |---|---|
-| `SPRING_MAIL_HOST` | The SMTP host they give you |
+| `SPRING_MAIL_HOST` | The SMTP host, e.g. `smtp-relay.brevo.com` |
 | `SPRING_MAIL_PORT` | `587` |
-| `SPRING_MAIL_USERNAME` | The username they give you |
-| `SPRING_MAIL_PASSWORD` | The password or API key they give you |
+| `SPRING_MAIL_USERNAME` | The username the provider issues |
+| `SPRING_MAIL_PASSWORD` | The SMTP key or password |
+| `LEARNX_MAIL_FROM` | **The address messages are sent from** |
+| `LEARNX_MAIL_FROM_NAME` | Optional display name, e.g. `USTC LearnX` |
 
-With Gmail specifically, turn on 2-step verification and create an **App
-Password**. Gmail rejects your ordinary password.
+### `LEARNX_MAIL_FROM` is the one people get wrong
 
-### Making the mail arrive
+With a mailbox provider the username and the sending address are the same. With
+a relay they are not. Brevo issues a username like `8a1b2c001@smtp-brevo.com`
+and **will refuse to send from it** — the sender has to be an address you have
+verified with them.
 
-A message sent from a new service to a domain that has not authorised it tends
-to land in spam. Every provider above will ask you to add one or two records to
-your domain's DNS — usually SPF and DKIM — and will show you exactly what to
-add. It takes a few minutes and is worth doing; without it, password-recovery
-codes quietly go missing.
+So set `LEARNX_MAIL_FROM` to the address you verified, for example
+`noreply@learnx.help`. Leave it unset and the application warns at start-up that
+it is falling back to the username, which a relay will reject.
 
-If you no longer control the DNS for the domain, send from an address at a
-domain you do control instead.
+### Setting up Brevo
+
+1. Create the account, then find **SMTP & API** > **SMTP**
+2. Note the server, port, login and the SMTP key — the key is the password
+3. Under **Senders**, add and verify the address you want mail to come from
+4. Put that verified address in `LEARNX_MAIL_FROM`
+
+### Prove it works
+
+**Administration > Email** shows whether mail is configured and what it sends
+from, and has a **Send a test message to me** button.
+
+Use it. Mail goes wrong quietly: a relay refusing the sender, or a domain
+missing its records, looks exactly like everything working until a student needs
+a recovery code and never gets one. If the test fails, the mail server's own
+words are shown, which is usually enough to say what is wrong.
+
+### Make it arrive, not go to spam
+
+Mail sent from a new service for a domain that has not authorised it tends to be
+filtered. Your provider will give you a couple of DNS records — usually SPF and
+DKIM — to add to the domain. Add them.
+
+If the test message arrives in spam, that is the thing to fix. If you no longer
+control the DNS for the domain, send from a domain you do control instead.
 
 ---
 
@@ -430,6 +454,8 @@ Open **Logs** on the web service and look for the first line containing `ERROR`.
 | `Schema-validation: missing table` | Migrations did not run | Check the log for a Flyway error above this line |
 | Site loads but every sign-in fails | Usually a stale session | Try a private browsing window |
 | Uploaded files vanish after a deploy | No disk attached | Step 4 |
+| Sign-up notices or recovery codes never arrive | Mail rejected or filtered | Administration > Email, send a test. If it fails the mail server's reason is shown; if it arrives in spam, add the SPF and DKIM records |
+| The test says the sender was rejected | `LEARNX_MAIL_FROM` is not a verified sender | Set it to an address verified with your mail provider, not the SMTP username |
 
 **Free instances sleep.** After a period of no traffic Render stops a free
 service, and the next visit takes up to a minute while it starts. That is the
