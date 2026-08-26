@@ -21,14 +21,14 @@ async function signIn(page: import('@playwright/test').Page, email: string) {
   await page.getByLabel('Password').fill('password')
   // Scoped to the form: the header link to this page carries the same name.
   await page.locator('form').getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Home' })).toBeVisible()
 }
 
 async function signOut(page: import('@playwright/test').Page) {
   await page.getByRole('button', { name: 'Sign out' }).click()
   // Signing out lands on the public homepage.
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Dashboard' })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Home' })).toHaveCount(0)
 }
 
 test('a visitor sees the universities and can reach one of them', async ({ page }) => {
@@ -77,7 +77,7 @@ test('a student can sign in and reach every screen', async ({ page }) => {
 test('a student can sit an exam and see the result recorded', async ({ page }) => {
   await signIn(page, 'student@learnx.help')
 
-  await page.getByRole('link', { name: 'Exams', exact: true }).click()
+  await page.getByRole('link', { name: 'Online exams' }).click()
   // The page heading, addressed by level so a card title can never collide.
   await expect(page.getByRole('heading', { level: 1, name: 'Exams' })).toBeVisible()
 
@@ -119,7 +119,7 @@ test('a student can sit an exam and see the result recorded', async ({ page }) =
 test('a student cannot reach the administration screens', async ({ page }) => {
   await signIn(page, 'student@learnx.help')
 
-  await expect(page.getByRole('link', { name: 'Administration' })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Account approvals' })).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'Gradebook' })).toHaveCount(0)
 
   // Typing the address directly returns them to the dashboard.
@@ -135,7 +135,7 @@ test('an administrator sees the administration screens', async ({ page }) => {
   await expect(page.getByText('Awaiting approval')).toBeVisible()
 
   // Scoped to the sidebar: the dashboard also links to this screen.
-  await page.getByLabel('Sections').getByRole('link', { name: 'Administration' }).click()
+  await page.getByLabel('Sections').getByRole('link', { name: 'Account approvals' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Administration' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Account approvals' })).toBeVisible()
 
@@ -160,6 +160,43 @@ test('the platform owner sees the platform, not a class', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1, name: 'Platform' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Universities' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Site branding' })).toBeVisible()
+})
+
+test('each role gets its own navigation, not a longer one', async ({ page }) => {
+  const nav = page.getByLabel('Sections')
+
+  await signIn(page, 'teacher@learnx.help')
+
+  // A teacher's sidebar is built around teaching: no "My results", which only
+  // reports a student's own marks, and the marking screens instead.
+  await expect(nav.getByRole('link', { name: 'Routine & class tests' })).toBeVisible()
+  await expect(nav.getByRole('link', { name: 'Gradebook' })).toBeVisible()
+  await expect(nav.getByRole('link', { name: 'Note approvals' })).toBeVisible()
+  await expect(nav.getByRole('link', { name: 'My results' })).toHaveCount(0)
+
+  await signOut(page)
+  await signIn(page, 'cr@learnx.help')
+
+  // A class representative keeps the routine, so the entry says so.
+  await expect(nav.getByRole('link', { name: 'Routine & test slots' })).toBeVisible()
+  await expect(nav.getByRole('link', { name: 'Gradebook' })).toHaveCount(0)
+
+  await signOut(page)
+  await signIn(page, 'admin@learnx.help')
+
+  // An administrator's own screens are separate entries rather than one
+  // "Administration" that lands on whichever tab happens to come first.
+  await expect(nav.getByRole('link', { name: 'Master routine' })).toBeVisible()
+
+  await nav.getByRole('link', { name: 'Change history' }).click()
+  await expect(page).toHaveURL(/\/admin\?view=audit$/)
+  await expect(page.getByText('Changes to the routine and class tests')).toBeVisible()
+
+  // Those entries all address /admin and differ only by the view they open,
+  // so exactly one of them may be marked as the current page.
+  const current = nav.locator('[aria-current="page"]')
+  await expect(current).toHaveCount(1)
+  await expect(current).toHaveText('Change history')
 })
 
 test('the health probe answers without a session', async ({ request }) => {
