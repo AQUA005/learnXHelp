@@ -13,6 +13,7 @@ import jakarta.servlet.http.HttpSession;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.DisabledException;
@@ -25,6 +26,7 @@ import org.springframework.security.web.context.HttpSessionSecurityContextReposi
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -41,14 +43,14 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/auth")
 @AllArgsConstructor
+@Slf4j
 public class AuthController {
-
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AuthController.class);
 
     private final AuthenticationManager authenticationManager;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final UniversityRepository universityRepository;
+    private final com.ustc.learnx.repository.SystemMetadataRepository systemMetadataRepository;
     private final org.springframework.mail.javamail.JavaMailSender mailSender;
     private final org.springframework.core.env.Environment env;
     private final com.ustc.learnx.service.UsernameGenerator usernameGenerator;
@@ -239,6 +241,29 @@ public class AuthController {
                 .findBySlugAndPublishedTrue(request.getUniversitySlug().trim())
                 .orElseThrow(() -> new ValidationException("That university is not open for registration"));
 
+        // The form offers these as dropdowns, but a request posted straight at
+        // the API carries whatever the sender chose to put in it. Where an
+        // administrator has published a list of permitted values, hold the
+        // submission to it: an invented department or semester matches no
+        // class, routine or gradebook, and the mismatch only surfaces later as
+        // a student who cannot see anything.
+        String optionError = checkOption(uni, "DEPARTMENT", "Department", request.getDepartment());
+        if (optionError == null && (userRole == Role.STUDENT || userRole == Role.CR)) {
+            optionError = checkOption(uni, "BATCH", "Batch", request.getBatch());
+            if (optionError == null) {
+                optionError = checkOption(uni, "SEMESTER", "Semester", request.getSemester());
+            }
+            if (optionError == null) {
+                optionError = checkOption(uni, "SECTION", "Section", request.getSection());
+            }
+        }
+        if (optionError == null && userRole == Role.TEACHER) {
+            optionError = checkOption(uni, "DESIGNATION", "Designation", request.getDesignation());
+        }
+        if (optionError != null) {
+            throw new ValidationException(optionError);
+        }
+
         User user = User.builder()
                 .username(usernameGenerator.forEmail(email))
                 .password(passwordEncoder.encode(request.getPassword()))
@@ -260,7 +285,7 @@ public class AuthController {
 
         try {
             org.springframework.mail.SimpleMailMessage message = new org.springframework.mail.SimpleMailMessage();
-            String fromEmail = env.getProperty("spring.mail.username");
+            String fromEmail = env.getProperty("learnx.mail.from");
             if (fromEmail != null && !fromEmail.isEmpty()) {
                 message.setFrom(fromEmail);
             }
@@ -274,11 +299,39 @@ public class AuthController {
                     + "LearnX Team");
             mailSender.send(message);
         } catch (Exception ex) {
+            // Warn, not error: the account was created, and the exception is
+            // passed so the cause reaches the log rather than just its message.
             log.warn("Could not send the signup email to {}", user.getEmail(), ex);
         }
 
         return ResponseEntity.ok(Map.of("message",
                 "Your form is under progress. You will be notified via email once approved."));
+    }
+
+    /**
+     * Checks one submitted dropdown value against the list an administrator has
+     * published for it.
+     *
+     * @return the message to report back, or null when the value is acceptable
+     */
+    private String checkOption(University university, String type, String label, String value) {
+        // Scoped by the query. Reading every row and filtering in memory used to
+        // let a row belonging to no university satisfy this check for all of
+        // them; since V4 every row has one, so there is nothing to fall back to.
+        List<String> permitted = systemMetadataRepository
+                .findByTypeAndUniversity(type, university).stream()
+                .map(com.ustc.learnx.entity.SystemMetadata::getValue)
+                .toList();
+
+        // Nothing published for this field, so it is free text by design — the
+        // form renders it as a text box in exactly the same case.
+        if (permitted.isEmpty()) {
+            return null;
+        }
+        if (value == null || !permitted.contains(value.trim())) {
+            return label + " must be one of the options offered on the form.";
+        }
+        return null;
     }
 
     @GetMapping("/current-user")

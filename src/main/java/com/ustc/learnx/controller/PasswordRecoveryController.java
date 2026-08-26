@@ -168,7 +168,7 @@ public class PasswordRecoveryController {
     private void sendCode(User user, String code) {
         try {
             SimpleMailMessage mailMessage = new SimpleMailMessage();
-            String fromEmail = env.getProperty("spring.mail.username");
+            String fromEmail = env.getProperty("learnx.mail.from");
             if (fromEmail != null && !fromEmail.isEmpty()) {
                 mailMessage.setFrom(fromEmail);
             }

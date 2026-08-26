@@ -111,6 +111,8 @@ class AuthorizationMatrixTest {
             "GET,    /api/admin/teachers",
             "GET,    /api/admin/students",
             "GET,    /api/admin/classes/1",
+            "GET,    /api/admin/users",
+            "POST,   /api/admin/users/1/reset-password",
             "GET,    /api/master/universities",
             "POST,   /api/master/universities/1/reset-admin",
             "DELETE, /api/master/universities/1",
@@ -227,6 +229,8 @@ class AuthorizationMatrixTest {
             "POST,   /api/exams/create",
             "GET,    /api/exams/1/submissions",
             "POST,   /api/announcements",
+            "GET,    /api/admin/users",
+            "POST,   /api/admin/users/1/reset-password",
             "DELETE, /api/announcements/1"
     })
     void studentIsDeniedStaffEndpoints(String method, String path) throws Exception {
@@ -257,6 +261,8 @@ class AuthorizationMatrixTest {
             "GET, /api/admin/pending",
             "GET, /api/admin/teachers",
             "GET, /api/admin/classes/1",
+            "GET, /api/admin/users",
+            "POST, /api/admin/users/1/reset-password",
             "GET, /api/master/users/emails",
             "GET, /api/schedule/audit-logs"
     })
