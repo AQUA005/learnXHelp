@@ -32,17 +32,23 @@ public class MetadataController {
     public record MetadataResponse(Long id, String type, String value) {
     }
 
+    /**
+     * The signed-in caller's own lists.
+     *
+     * <p>Scoped by a query rather than by loading every row and filtering in
+     * memory. The filter this replaced passed a row through whenever the caller
+     * had no university of their own — so an anonymous request, or a platform
+     * owner's, was answered with every university's reference data at once.
+     *
+     * <p>The signup form is served by {@code /api/public/universities/{slug}/metadata}
+     * instead: it has no session to be scoped by.
+     */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping
     public ResponseEntity<List<MetadataResponse>> getAllMetadata() {
-        Long universityId = currentUserService.currentUser()
-                .map(u -> u.getUniversity() == null ? null : u.getUniversity().getId())
-                .orElse(null);
-
-        List<SystemMetadata> options = systemMetadataRepository.findAll().stream()
-                .filter(m -> universityId == null
-                        || m.getUniversity() == null
-                        || universityId.equals(m.getUniversity().getId()))
-                .toList();
+        List<SystemMetadata> options = currentUserService.isSystemAdmin()
+                ? List.of()
+                : systemMetadataRepository.findByUniversity(currentUserService.requireUniversity());
 
         return ResponseEntity.ok(options.stream()
                 .map(m -> new MetadataResponse(m.getId(), m.getType(), m.getValue()))

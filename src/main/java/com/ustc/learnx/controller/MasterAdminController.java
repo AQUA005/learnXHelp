@@ -1,6 +1,9 @@
 package com.ustc.learnx.controller;
 
+import com.ustc.learnx.common.NotFoundException;
+import com.ustc.learnx.common.ValidationException;
 import com.ustc.learnx.entity.*;
+import com.ustc.learnx.service.UniversityProvisioningService;
 import com.ustc.learnx.entity.User.Role;
 import com.ustc.learnx.repository.*;
 import lombok.AllArgsConstructor;
@@ -50,6 +53,11 @@ public class MasterAdminController {
     private final BugReportRepository bugReportRepository;
     private final org.springframework.mail.javamail.JavaMailSender mailSender;
     private final org.springframework.core.env.Environment env;
+    private final com.ustc.learnx.repository.PlatformSettingsRepository platformSettingsRepository;
+    private final com.ustc.learnx.service.BrandingService brandingService;
+    private final com.ustc.learnx.service.UniversityProvisioningService universityProvisioningService;
+    private final com.ustc.learnx.service.CurrentUserService currentUserService;
+    private final com.ustc.learnx.service.AuditService auditService;
 
     @Data
     @NoArgsConstructor
@@ -57,124 +65,240 @@ public class MasterAdminController {
     public static class UniversityRegistrationRequest {
         private String name;
         private String domain;
-        private String logoUrl;
-        private String adminUsername;
-        private String adminPassword;
+        private String description;
+        private String contactEmail;
         private String adminFullName;
         private String adminEmail;
+        private String adminPassword;
     }
 
+    /**
+     * The editable parts of a university.
+     *
+     * <p>No {@code slug}: it is the public URL key and is fixed at creation, so
+     * links people have shared keep working. No {@code logoUrl} either — a logo
+     * arrives through the upload endpoint and its address is computed by the
+     * server, because the Content-Security-Policy will not load a remote one.
+     */
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
     public static class UniversityUpdateRequest {
         private String name;
         private String domain;
-        private String logoUrl;
+        private String description;
+        private String contactEmail;
+        private String contactPhone;
+        private String website;
+        private String address;
+    }
+
+    /** A university as the platform console shows it. */
+    public record UniversityResponse(
+            Long id, String name, String domain, String slug, String description,
+            String contactEmail, String contactPhone, String website, String address,
+            String logoUrl, boolean published, String adminEmail) {
+
+        static UniversityResponse of(University u, String adminEmail) {
+            return new UniversityResponse(u.getId(), u.getName(), u.getDomain(), u.getSlug(),
+                    u.getDescription(), u.getContactEmail(), u.getContactPhone(), u.getWebsite(),
+                    u.getAddress(), u.getLogoUrl(), u.isPublished(), adminEmail);
+        }
     }
 
     @PostMapping("/universities")
     public ResponseEntity<?> registerUniversity(@RequestBody UniversityRegistrationRequest request) {
-        if (universityRepository.existsByName(request.getName())) {
-            return ResponseEntity.badRequest().body(Map.of("error", "University name already registered"));
-        }
-        if (universityRepository.existsByDomain(request.getDomain())) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Subdomain already taken"));
-        }
-        if (userRepository.existsByUsername(request.getAdminUsername())) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Admin username already exists"));
-        }
-
-        // 1. Create and save University
-        University uni = University.builder()
-                .name(request.getName())
-                .domain(request.getDomain())
-                .logoUrl(request.getLogoUrl())
-                .build();
-        uni = universityRepository.save(uni);
-
-        // 2. Create University Admin user
-        User admin = User.builder()
-                .username(request.getAdminUsername())
-                .password(passwordEncoder.encode(request.getAdminPassword()))
-                .fullName(request.getAdminFullName())
-                .email(request.getAdminEmail())
-                .role(Role.ADMIN) // University admin
-                .approved(true)
-                .university(uni)
-                .build();
-        userRepository.save(admin);
-
-        return ResponseEntity.ok(uni);
+        University created = universityProvisioningService.create(
+                new UniversityProvisioningService.NewUniversity(
+                        request.getName(), request.getDomain(), request.getDescription(),
+                        request.getContactEmail(), request.getAdminFullName(),
+                        request.getAdminEmail(), request.getAdminPassword()),
+                currentUserService.requireCurrentUser().getUsername());
+        return ResponseEntity.ok(withAdmin(created));
     }
 
     @GetMapping("/universities")
-    public ResponseEntity<List<University>> listUniversities() {
-        return ResponseEntity.ok(universityRepository.findAll());
+    public ResponseEntity<List<UniversityResponse>> listUniversities() {
+        return ResponseEntity.ok(universityRepository.findAll().stream()
+                .map(this::withAdmin).toList());
+    }
+
+    @GetMapping("/universities/{id}")
+    public ResponseEntity<UniversityResponse> getUniversity(@PathVariable Long id) {
+        return ResponseEntity.ok(withAdmin(requireUniversity(id)));
     }
 
     @PutMapping("/universities/{id}")
     public ResponseEntity<?> updateUniversity(@PathVariable Long id, @RequestBody UniversityUpdateRequest request) {
-        Optional<University> uniOpt = universityRepository.findById(id);
-        if (uniOpt.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-        University uni = uniOpt.get();
+        University uni = requireUniversity(id);
 
-        // Check conflicts
-        Optional<University> existingName = universityRepository.findByName(request.getName());
-        if (existingName.isPresent() && !existingName.get().getId().equals(id)) {
-            return ResponseEntity.badRequest().body(Map.of("error", "University name already taken"));
-        }
-        Optional<University> existingDomain = universityRepository.findByDomain(request.getDomain());
-        if (existingDomain.isPresent() && !existingDomain.get().getId().equals(id)) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Subdomain already taken"));
-        }
+        // A blank name or domain would otherwise be written over a good one:
+        // both were previously set unconditionally from the request.
+        String name = required(request.getName(), "A university name is required");
+        String domain = required(request.getDomain(), "A domain is required")
+                .toLowerCase(java.util.Locale.ROOT);
 
-        uni.setName(request.getName());
-        uni.setDomain(request.getDomain());
-        if (request.getLogoUrl() != null) {
-            uni.setLogoUrl(request.getLogoUrl());
-        }
-        universityRepository.save(uni);
-        return ResponseEntity.ok(uni);
+        universityRepository.findByName(name)
+                .filter(other -> !other.getId().equals(id))
+                .ifPresent(other -> {
+                    throw new ValidationException("A university with that name is already registered");
+                });
+        universityRepository.findByDomain(domain)
+                .filter(other -> !other.getId().equals(id))
+                .ifPresent(other -> {
+                    throw new ValidationException("That domain is already taken");
+                });
+
+        uni.setName(name);
+        uni.setDomain(domain);
+        uni.setDescription(trimmed(request.getDescription()));
+        uni.setContactEmail(trimmed(request.getContactEmail()));
+        uni.setContactPhone(trimmed(request.getContactPhone()));
+        uni.setWebsite(trimmed(request.getWebsite()));
+        uni.setAddress(trimmed(request.getAddress()));
+
+        University saved = universityRepository.save(uni);
+        auditService.record("UNIVERSITY", "UPDATE",
+                currentUserService.requireCurrentUser().getUsername(),
+                "Updated '" + saved.getName() + "'");
+        return ResponseEntity.ok(withAdmin(saved));
     }
 
+    /**
+     * Listing a university publicly, or taking it back off the homepage.
+     *
+     * <p>Separate from the profile update so that publishing is one deliberate,
+     * auditable action, and so that saving a half-finished profile can never
+     * make a university public as a side effect.
+     */
+    @PutMapping("/universities/{id}/publish")
+    public ResponseEntity<?> setPublished(@PathVariable Long id, @RequestBody Map<String, Boolean> body) {
+        boolean published = Boolean.TRUE.equals(body.get("published"));
+        University saved = universityProvisioningService.setPublished(
+                requireUniversity(id), published,
+                currentUserService.requireCurrentUser().getUsername());
+        return ResponseEntity.ok(withAdmin(saved));
+    }
+
+    @PostMapping("/universities/{id}/logo")
+    public ResponseEntity<?> uploadUniversityLogo(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(withAdmin(
+                brandingService.storeUniversityLogo(requireUniversity(id), body.get("dataUrl"))));
+    }
+
+    @DeleteMapping("/universities/{id}/logo")
+    public ResponseEntity<?> removeUniversityLogo(@PathVariable Long id) {
+        return ResponseEntity.ok(withAdmin(
+                brandingService.removeUniversityLogo(requireUniversity(id))));
+    }
+
+    // --- LearnX's own branding ---
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class BrandingUpdateRequest {
+        private String siteName;
+        private String tagline;
+        private String supportEmail;
+    }
+
+    @GetMapping("/branding")
+    public ResponseEntity<?> getBranding() {
+        return ResponseEntity.ok(brandingService.settings());
+    }
+
+    @PutMapping("/branding")
+    public ResponseEntity<?> updateBranding(@RequestBody BrandingUpdateRequest request) {
+        var settings = brandingService.settings();
+        settings.setSiteName(required(request.getSiteName(), "A site name is required"));
+        settings.setTagline(trimmed(request.getTagline()));
+        settings.setSupportEmail(trimmed(request.getSupportEmail()));
+        settings.setUpdatedAt(java.time.LocalDateTime.now());
+        return ResponseEntity.ok(platformSettingsRepository.save(settings));
+    }
+
+    @PostMapping("/branding/logo")
+    public ResponseEntity<?> uploadPlatformLogo(@RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(brandingService.storePlatformLogo(body.get("dataUrl")));
+    }
+
+    @PostMapping("/branding/icon")
+    public ResponseEntity<?> uploadPlatformIcon(@RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(brandingService.storePlatformIcon(body.get("dataUrl")));
+    }
+
+    // --- Shared ---
+
+    private University requireUniversity(Long id) {
+        return universityRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("No university with id " + id));
+    }
+
+    /** The console lists each university alongside who administers it. */
+    private UniversityResponse withAdmin(University university) {
+        String adminEmail = userRepository.findByUniversityAndRole(university, Role.ADMIN)
+                .stream().findFirst().map(User::getEmail).orElse(null);
+        return UniversityResponse.of(university, adminEmail);
+    }
+
+    private static String required(String value, String message) {
+        if (value == null || value.isBlank()) {
+            throw new ValidationException(message);
+        }
+        return value.trim();
+    }
+
+    private static String trimmed(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    /**
+     * Gives a university's administrator a new password, so a tenant that has
+     * locked itself out can be let back in.
+     *
+     * <p>Keyed by email, which is what people sign in with. The password is held
+     * to the same policy as any other: it was not, so the account with the most
+     * power in a tenant could be given a weaker one than its students.
+     */
     @PostMapping("/universities/{id}/reset-admin")
     public ResponseEntity<?> resetAdminPassword(@PathVariable Long id, @RequestBody Map<String, String> body) {
-        Optional<University> uniOpt = universityRepository.findById(id);
-        if (uniOpt.isEmpty()) {
-            return ResponseEntity.notFound().build();
+        University uni = requireUniversity(id);
+
+        String email = required(body.get("adminEmail"), "An administrator email is required")
+                .toLowerCase(java.util.Locale.ROOT);
+        String password = required(body.get("adminPassword"), "A new password is required");
+
+        String policyError = com.ustc.learnx.common.PasswordPolicy.validate(password);
+        if (policyError != null) {
+            throw new ValidationException(policyError);
         }
 
-        String username = body.get("adminUsername");
-        String password = body.get("adminPassword");
-
-        if (username == null || username.trim().isEmpty() || password == null || password.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Admin username and password are required"));
-        }
-
-        // Find or create admin user for this university
-        Optional<User> adminOpt = userRepository.findByUsername(username);
-        User admin;
-        if (adminOpt.isPresent()) {
-            admin = adminOpt.get();
-            if (!admin.getRole().equals(Role.ADMIN) || admin.getUniversity() == null || !admin.getUniversity().getId().equals(id)) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Username belongs to another user role or university"));
-            }
-            admin.setPassword(passwordEncoder.encode(password));
-        } else {
+        User admin = userRepository.findByEmail(email).orElse(null);
+        if (admin == null) {
+            // No account with that address: create one for this university.
             admin = User.builder()
-                    .username(username)
-                    .password(passwordEncoder.encode(password))
-                    .fullName("University Admin")
-                    .email("admin@" + uniOpt.get().getDomain())
+                    .username(email.substring(0, email.indexOf('@')).replaceAll("[^a-z0-9.]", ""))
+                    .fullName("University Administrator")
+                    .email(email)
                     .role(Role.ADMIN)
                     .approved(true)
-                    .university(uniOpt.get())
+                    .university(uni)
                     .build();
+        } else if (admin.getRole() != Role.ADMIN
+                || admin.getUniversity() == null
+                || !admin.getUniversity().getId().equals(id)) {
+            throw new ValidationException(
+                    "That address belongs to a different account or a different university");
         }
+
+        admin.setPassword(passwordEncoder.encode(password));
         userRepository.save(admin);
+
+        auditService.record("UNIVERSITY", "RESET_ADMIN",
+                currentUserService.requireCurrentUser().getUsername(),
+                "Reset the administrator password for '" + uni.getName() + "'");
+
         return ResponseEntity.ok(Map.of("message", "University admin account successfully updated"));
     }
 
@@ -295,6 +419,12 @@ public class MasterAdminController {
 
         // 17. Finally, delete the University
         universityRepository.delete(uni);
+
+        // Written last, and deliberately: this is irreversible, and until now it
+        // left no record at all that it had happened.
+        auditService.record("UNIVERSITY", "DELETE",
+                currentUserService.requireCurrentUser().getUsername(),
+                "Deleted '" + uni.getName() + "' and all of its data");
 
         return ResponseEntity.ok(Map.of("message", "University and all associated data deleted successfully"));
     }

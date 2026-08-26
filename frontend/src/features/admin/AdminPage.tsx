@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { useToast } from '@/lib/toast'
 import { formatDateTime } from '@/lib/format'
@@ -127,42 +128,37 @@ function Approvals() {
   )
 }
 
+/**
+ * A class group as `/api/admin/classes` lists it.
+ *
+ * `className` and the representative fields are genuinely present now. The
+ * server used to omit `className` entirely — so the Class column rendered
+ * blank — and sent the string "None Assigned" rather than null for an
+ * unassigned representative, so the fallback below never showed.
+ */
 type ClassGroup = {
   id: number
   className: string
   batch: string
   department: string
   section: string
-  studentsCount?: number
-  crUsername?: string | null
+  semester: string
+  studentsCount: number
+  crUsername: string | null
+  crFullName: string | null
 }
 
+/**
+ * The class groups, as a way in rather than a place to act.
+ *
+ * Promotion and rollback used to sit on each row here, one click away and with
+ * nothing to say which class was about to move. They live on the class's own
+ * screen now, next to the roster they affect.
+ */
 function Classes() {
-  const queryClient = useQueryClient()
-  const { notify, reportError } = useToast()
-
   const classes = useQuery({
     queryKey: ['classes'],
     queryFn: () => api.get<ClassGroup[]>('/api/admin/classes'),
-  })
-
-  const promote = useMutation({
-    mutationFn: (id: number) => api.post<{ message: string }>(`/api/admin/classes/${id}/promote`),
-    onSuccess: (result) => {
-      notify(result.message, 'success')
-      void queryClient.invalidateQueries({ queryKey: ['classes'] })
-    },
-    onError: (error) => reportError(error),
-  })
-
-  const rollback = useMutation({
-    mutationFn: (id: number) =>
-      api.post<{ message: string }>(`/api/admin/classes/${id}/rollback-promotion`),
-    onSuccess: (result) => {
-      notify(result.message, 'success')
-      void queryClient.invalidateQueries({ queryKey: ['classes'] })
-    },
-    onError: (error) => reportError(error),
   })
 
   const items = classes.data ?? []
@@ -187,26 +183,15 @@ function Classes() {
             <tbody>
               {items.map((group) => (
                 <tr key={group.id}>
-                  <td>{group.className}</td>
-                  <td className="mono">{group.studentsCount ?? 0}</td>
-                  <td>{group.crUsername ?? <span className="muted">none</span>}</td>
                   <td>
-                    <div className="row">
-                      <button
-                        className="btn btn-sm"
-                        onClick={() => promote.mutate(group.id)}
-                        disabled={promote.isPending}
-                      >
-                        Promote a semester
-                      </button>
-                      <button
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => rollback.mutate(group.id)}
-                        disabled={rollback.isPending}
-                      >
-                        Undo
-                      </button>
-                    </div>
+                    <Link to={`/admin/classes/${group.id}`}>{group.className}</Link>
+                  </td>
+                  <td className="mono">{group.studentsCount ?? 0}</td>
+                  <td>{group.crFullName ?? <span className="muted">none</span>}</td>
+                  <td>
+                    <Link className="btn btn-secondary btn-sm" to={`/admin/classes/${group.id}`}>
+                      Open
+                    </Link>
                   </td>
                 </tr>
               ))}

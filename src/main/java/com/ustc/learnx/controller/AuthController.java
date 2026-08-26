@@ -1,5 +1,8 @@
 package com.ustc.learnx.controller;
 
+import com.ustc.learnx.common.AccessDeniedException;
+import com.ustc.learnx.common.UnauthorizedException;
+import com.ustc.learnx.common.ValidationException;
 import com.ustc.learnx.entity.User;
 import com.ustc.learnx.entity.User.Role;
 import com.ustc.learnx.entity.University;
@@ -12,8 +15,10 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
@@ -23,10 +28,22 @@ import java.security.Principal;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * Signing in, signing up and reading back the current account.
+ *
+ * <p>Failures here are thrown as {@link ValidationException},
+ * {@link AccessDeniedException} and {@link UnauthorizedException} rather than returned as
+ * {@code Map.of("error", …)} bodies. The frontend reads {@code message},
+ * {@code detail} then {@code title} from a response; an {@code error} key
+ * matches none of them, so every validation failure used to reach the user as
+ * the unhelpful "Request failed (400)".
+ */
 @RestController
 @RequestMapping("/api/auth")
 @AllArgsConstructor
 public class AuthController {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AuthController.class);
 
     private final AuthenticationManager authenticationManager;
     private final UserRepository userRepository;
@@ -34,20 +51,37 @@ public class AuthController {
     private final UniversityRepository universityRepository;
     private final org.springframework.mail.javamail.JavaMailSender mailSender;
     private final org.springframework.core.env.Environment env;
+    private final com.ustc.learnx.service.UsernameGenerator usernameGenerator;
 
+    /**
+     * Credentials from the sign-in form.
+     *
+     * <p>{@code username} is accepted as an alias so a browser holding an older
+     * bundle keeps working; {@link com.ustc.learnx.service.CustomUserDetailsService}
+     * resolves either form.
+     */
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
     public static class LoginRequest {
-        private String username;
+        @com.fasterxml.jackson.annotation.JsonAlias("username")
+        private String email;
         private String password;
     }
 
+    /**
+     * A new account request.
+     *
+     * <p>No username: it is derived from the email by {@link UsernameGenerator}.
+     * {@code universitySlug} says which university is being joined, and is
+     * checked against a published one — signing up to an unlisted university
+     * must be refused, or the platform owner's publish gate is decorative.
+     */
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
     public static class SignupRequest {
-        private String username;
+        private String universitySlug;
         private String password;
         private String fullName;
         private String email;
@@ -60,76 +94,102 @@ public class AuthController {
         private String designation;
     }
 
-    @Data
-    @AllArgsConstructor
-    public static class UserResponse {
-        private Long id;
-        private String username;
-        private String fullName;
-        private String email;
-        private String role;
-        private String idNo;
-        private String department;
-        private String batch;
-        private String semester;
-        private String section;
-        private String designation;
-        private String profilePicUrl;
+    /**
+     * The account as the client sees it.
+     *
+     * <p>Built only through {@link #from(User)}. Both the login response and
+     * {@code /current-user} return this shape, and the frontend stores the login
+     * response directly as its session user — so the two must never drift.
+     * Constructing it positionally at two call sites is how they would.
+     */
+    public record UserResponse(
+            Long id,
+            String username,
+            String fullName,
+            String email,
+            String role,
+            String idNo,
+            String department,
+            String batch,
+            String semester,
+            String section,
+            String designation,
+            String profilePicUrl,
+            boolean approved,
+            UniversitySummary university) {
+
+        public static UserResponse from(User user) {
+            return new UserResponse(
+                    user.getId(),
+                    user.getUsername(),
+                    user.getFullName(),
+                    user.getEmail(),
+                    user.getRole().name(),
+                    user.getIdNo(),
+                    user.getDepartment(),
+                    user.getBatch(),
+                    user.getSemester(),
+                    user.getSection(),
+                    user.getDesignation(),
+                    user.getProfilePicUrl(),
+                    user.isApproved(),
+                    UniversitySummary.of(user.getUniversity()));
+        }
+    }
+
+    /**
+     * Which university the signed-in account belongs to, for branding the shell.
+     *
+     * <p>Null for a platform owner, who sits above any single university.
+     */
+    public record UniversitySummary(String slug, String name, String logoUrl) {
+
+        static UniversitySummary of(University university) {
+            return university == null ? null : new UniversitySummary(
+                    university.getSlug(), university.getName(), university.getLogoUrl());
+        }
     }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request, HttpServletRequest servletRequest) {
+        Authentication authentication;
         try {
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
+            authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
             );
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-            
-            HttpSession session = servletRequest.getSession(true);
-            session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, SecurityContextHolder.getContext());
-            
-            Optional<User> userOpt = userRepository.findByUsername(request.getUsername());
-            if (userOpt.isPresent()) {
-                User user = userOpt.get();
-                if (!user.isApproved()) {
-                    SecurityContextHolder.clearContext();
-                    if (session != null) {
-                        session.invalidate();
-                    }
-                    return ResponseEntity.status(403).body(Map.of("error", "Your account is pending administrator approval."));
-                }
-                return ResponseEntity.ok(new UserResponse(
-                        user.getId(), 
-                        user.getUsername(), 
-                        user.getFullName(), 
-                        user.getEmail(), 
-                        user.getRole().name(),
-                        user.getIdNo(),
-                        user.getDepartment(),
-                        user.getBatch(),
-                        user.getSemester(),
-                        user.getSection(),
-                        user.getDesignation(),
-                        user.getProfilePicUrl()
-                ));
-            }
-            // Authentication succeeded, so the account row must exist.
-            throw new IllegalStateException("Authenticated principal has no account row");
-        } catch (org.springframework.security.authentication.DisabledException e) {
-            return ResponseEntity.status(403)
-                    .body(Map.of("error", "Your account is pending administrator approval."));
-        } catch (Exception e) {
-            return ResponseEntity.status(401).body(Map.of("error", "Invalid username or password"));
+        } catch (DisabledException e) {
+            // CustomUserDetailsService marks an unapproved account disabled.
+            throw new AccessDeniedException("Your account is pending administrator approval.");
+        } catch (AuthenticationException e) {
+            // Deliberately the same answer for an unknown account and a wrong
+            // password, so this cannot be used to enumerate accounts. Only
+            // authentication failures land here: a server fault must surface as
+            // a 500 rather than be reported to the user as bad credentials.
+            throw new UnauthorizedException("Invalid email or password");
         }
+
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        HttpSession session = servletRequest.getSession(true);
+        session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
+                SecurityContextHolder.getContext());
+
+        User user = userRepository.findByUsername(authentication.getName())
+                // Authentication succeeded, so the account row must exist.
+                .orElseThrow(() -> new IllegalStateException("Authenticated principal has no account row"));
+
+        return ResponseEntity.ok(UserResponse.from(user));
     }
 
     @PostMapping("/signup")
     public ResponseEntity<?> signup(@RequestBody SignupRequest request) {
-        if (userRepository.existsByUsername(request.getUsername())) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Username already exists"));
+        if (request.getEmail() == null || request.getEmail().trim().isEmpty()) {
+            throw new ValidationException("An email address is required");
         }
-        if (request.getEmail() != null && !request.getEmail().trim().isEmpty() && userRepository.existsByEmail(request.getEmail())) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Email address is already registered"));
+        // Stored lower-cased so the unique constraint, which is case-sensitive,
+        // cannot end up holding two rows that a sign-in could not tell apart.
+        String email = request.getEmail().trim().toLowerCase(java.util.Locale.ROOT);
+        if (userRepository.existsByEmail(email)) {
+            throw new ValidationException("Email address is already registered");
         }
 
         // Only these roles may be self-selected. Administrator accounts are
@@ -141,50 +201,52 @@ public class AuthController {
             userRole = Role.STUDENT;
         }
         if (userRole != Role.STUDENT && userRole != Role.CR && userRole != Role.TEACHER) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Direct administrator registration is prohibited"));
+            throw new ValidationException("Direct administrator registration is prohibited");
         }
 
         String policyError = com.ustc.learnx.common.PasswordPolicy.validate(request.getPassword());
         if (policyError != null) {
-            return ResponseEntity.badRequest().body(Map.of("error", policyError));
+            throw new ValidationException(policyError);
         }
 
         // Enforce required fields
-        if (request.getUsername() == null || request.getUsername().trim().isEmpty() ||
-            request.getPassword() == null || request.getPassword().trim().isEmpty() ||
+        if (request.getPassword() == null || request.getPassword().trim().isEmpty() ||
             request.getFullName() == null || request.getFullName().trim().isEmpty() ||
-            request.getEmail() == null || request.getEmail().trim().isEmpty() ||
             request.getIdNo() == null || request.getIdNo().trim().isEmpty() ||
             request.getDepartment() == null || request.getDepartment().trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Please fill in all necessary registration fields."));
+            throw new ValidationException("Please fill in all necessary registration fields.");
         }
 
         if (userRole == Role.STUDENT || userRole == Role.CR) {
             if (request.getSemester() == null || request.getSemester().trim().isEmpty() ||
                 request.getBatch() == null || request.getBatch().trim().isEmpty() ||
                 request.getSection() == null || request.getSection().trim().isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Students/CRs must fill in Semester, Batch, and Section."));
+                throw new ValidationException("Students/CRs must fill in Semester, Batch, and Section.");
             }
         } else if (userRole == Role.TEACHER) {
             if (request.getDesignation() == null || request.getDesignation().trim().isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Teachers must specify Designation."));
+                throw new ValidationException("Teachers must specify Designation.");
             }
         }
 
-        // Single-tenant deployment: every new account joins the one university.
-        // This deliberately ignores any client-supplied domain hint.
-        University uni = universityRepository.findAll().stream().findFirst().orElse(null);
-
-        boolean approved = false;
+        // The university being joined, named by the signup form. Only a
+        // published one: an unlisted university is not open for registration,
+        // and treating it as one would make the publish gate decorative.
+        if (request.getUniversitySlug() == null || request.getUniversitySlug().isBlank()) {
+            throw new ValidationException("Choose the university you are joining");
+        }
+        University uni = universityRepository
+                .findBySlugAndPublishedTrue(request.getUniversitySlug().trim())
+                .orElseThrow(() -> new ValidationException("That university is not open for registration"));
 
         User user = User.builder()
-                .username(request.getUsername())
+                .username(usernameGenerator.forEmail(email))
                 .password(passwordEncoder.encode(request.getPassword()))
                 .fullName(request.getFullName())
-                .email(request.getEmail())
+                .email(email)
                 .role(userRole)
-                .approved(approved)
+                // Every new account waits for an administrator.
+                .approved(false)
                 .idNo(request.getIdNo())
                 .department(request.getDepartment())
                 .batch(request.getBatch())
@@ -212,39 +274,24 @@ public class AuthController {
                     + "LearnX Team");
             mailSender.send(message);
         } catch (Exception ex) {
-            System.err.println("Failed to send signup email to " + user.getEmail() + ": " + ex.getMessage());
+            log.warn("Could not send the signup email to {}", user.getEmail(), ex);
         }
 
-        return ResponseEntity.ok(Map.of("message", "Your form is under progress. You will be notified via email once approved."));
+        return ResponseEntity.ok(Map.of("message",
+                "Your form is under progress. You will be notified via email once approved."));
     }
 
     @GetMapping("/current-user")
     public ResponseEntity<?> getCurrentUser(Principal principal) {
         if (principal == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "Not authenticated"));
+            throw new UnauthorizedException("Not authenticated");
         }
         Optional<User> userOpt = userRepository.findByUsername(principal.getName());
-        if (userOpt.isPresent()) {
-            User user = userOpt.get();
-            return ResponseEntity.ok(new UserResponse(
-                    user.getId(), 
-                    user.getUsername(), 
-                    user.getFullName(), 
-                    user.getEmail(), 
-                    user.getRole().name(),
-                    user.getIdNo(),
-                    user.getDepartment(),
-                    user.getBatch(),
-                    user.getSemester(),
-                    user.getSection(),
-                    user.getDesignation(),
-                    user.getProfilePicUrl()
-            ));
+        if (userOpt.isEmpty()) {
+            throw new UnauthorizedException("User session invalid");
         }
-        return ResponseEntity.status(401).body(Map.of("error", "User session invalid"));
+        return ResponseEntity.ok(UserResponse.from(userOpt.get()));
     }
-
-
 
     @PostMapping("/logout")
     public ResponseEntity<?> logout(HttpServletRequest servletRequest) {

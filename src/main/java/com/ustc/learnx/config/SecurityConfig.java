@@ -33,14 +33,24 @@ import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    /** Static assets that make up the SPA shell. */
+    /** Files served from the jar. Each contains a dot, so none is a client route. */
     private static final String[] PUBLIC_ASSETS = {
             "/", "/index.html", "/favicon.ico",
-            "/assets/**", "/learnx_logo.png", "/ustc_building.jpg",
-            // Client-side routes resolve to the shell, so they must be
-            // reachable before sign-in for the login screen to render.
-            "/schedule", "/notes", "/announcements", "/exams", "/exams/**",
-            "/performance", "/gradebook", "/moderation", "/admin", "/profile"
+            "/assets/**", "/learnx_logo.png", "/ustc_building.jpg"
+    };
+
+    /**
+     * Client-side routes, which all resolve to the application shell.
+     *
+     * <p>The same patterns {@code SpaForwardingController} forwards, so this can
+     * never grant more than already returns {@code index.html}. It used to be a
+     * hand-written list of every route the React router owned, which had to be
+     * extended for each new screen; forgetting meant a hard refresh on that path
+     * answered 401 instead of rendering, with nothing to say why.
+     */
+    private static final String[] SPA_ROUTES = {
+            "/{path:" + com.ustc.learnx.controller.SpaForwardingController.ROUTE_SEGMENT + "}",
+            "/{path:" + com.ustc.learnx.controller.SpaForwardingController.ROUTE_SEGMENT + "}/**"
     };
 
     /** Reachable without a session so a container can probe the service. */
@@ -52,7 +62,11 @@ public class SecurityConfig {
     private static final String[] PUBLIC_ENDPOINTS = {
             "/api/auth/login",
             "/api/auth/signup",
-            "/api/auth/recover/**"
+            "/api/auth/recover/**",
+            // The pre-login homepage: platform branding, and the universities
+            // that have been published. PublicController is the only thing
+            // served here, and it exposes nothing tenant-scoped.
+            "/api/public/**"
     };
 
     @Bean
@@ -125,6 +139,9 @@ public class SecurityConfig {
                 // Everything else under /actuator is operational detail.
                 .requestMatchers("/actuator/**").hasRole("ADMIN")
                 .requestMatchers(PUBLIC_ASSETS).permitAll()
+                // GET only: these resolve to the shell, and nothing is ever
+                // written through them.
+                .requestMatchers(org.springframework.http.HttpMethod.GET, SPA_ROUTES).permitAll()
                 .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                 // Everything else — including /api/admin/** and /api/master/**,
                 // which were previously permitAll — needs a session. Role

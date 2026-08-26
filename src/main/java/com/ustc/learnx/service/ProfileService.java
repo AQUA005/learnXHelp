@@ -1,5 +1,6 @@
 package com.ustc.learnx.service;
 
+import com.ustc.learnx.common.ImageDataUrl;
 import com.ustc.learnx.common.NotFoundException;
 import com.ustc.learnx.common.ValidationException;
 import com.ustc.learnx.entity.ProfileChangeRequest;
@@ -26,14 +27,6 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class ProfileService {
-
-    /** Image types accepted for an avatar, mapped to the extension to store. */
-    private static final Map<String, String> ALLOWED_IMAGE_TYPES = Map.of(
-            "image/png", "png",
-            "image/jpeg", "jpg",
-            "image/jpg", "jpg",
-            "image/gif", "gif",
-            "image/webp", "webp");
 
     /** Avatars are small; anything larger is a mistake or an attempt to fill the disk. */
     private static final int MAX_AVATAR_BYTES = 2 * 1024 * 1024;
@@ -103,7 +96,7 @@ public class ProfileService {
             throw new NotFoundException("That user has no profile picture");
         }
         return new Avatar(fileStorageService.load(owner.getProfilePicKey()),
-                contentTypeFor(owner.getProfilePicKey()));
+                ImageDataUrl.contentTypeFor(owner.getProfilePicKey()));
     }
 
     public record Avatar(Resource content, String contentType) {
@@ -118,36 +111,12 @@ public class ProfileService {
      * tag's src attribute.
      */
     private void storeAvatar(User user, String dataUrl) {
-        if (!dataUrl.startsWith("data:")) {
-            throw new ValidationException("Profile picture must be an uploaded image");
-        }
-        int comma = dataUrl.indexOf(',');
-        if (comma < 0) {
-            throw new ValidationException("Profile picture is not a valid image");
-        }
-
-        String header = dataUrl.substring(5, comma).toLowerCase();
-        if (!header.contains(";base64")) {
-            throw new ValidationException("Profile picture must be a base64 encoded image");
-        }
-        String mimeType = header.substring(0, header.indexOf(';'));
-        String extension = ALLOWED_IMAGE_TYPES.get(mimeType);
-        if (extension == null) {
-            throw new ValidationException("Profile picture must be a PNG, JPEG, GIF or WebP image");
-        }
-
-        byte[] decoded;
-        try {
-            decoded = Base64.getDecoder().decode(dataUrl.substring(comma + 1));
-        } catch (IllegalArgumentException e) {
-            throw new ValidationException("Profile picture is not valid base64 data");
-        }
-        if (decoded.length > MAX_AVATAR_BYTES) {
-            throw new ValidationException("Profile picture must be smaller than 2 MB");
-        }
+        ImageDataUrl.DecodedImage image =
+                ImageDataUrl.decode(dataUrl, "Profile picture", MAX_AVATAR_BYTES);
 
         String previousKey = user.getProfilePicKey();
-        FileStorageService.StoredFile stored = fileStorageService.store(decoded, extension);
+        FileStorageService.StoredFile stored =
+                fileStorageService.store(image.bytes(), image.extension());
         user.setProfilePicKey(stored.storageKey());
         user.setProfilePicUrl("/api/profile/avatar/" + user.getId());
 
@@ -155,20 +124,6 @@ public class ProfileService {
         if (previousKey != null) {
             fileStorageService.delete(previousKey);
         }
-    }
-
-    private static String contentTypeFor(String storageKey) {
-        String lower = storageKey.toLowerCase();
-        if (lower.endsWith(".png")) {
-            return "image/png";
-        }
-        if (lower.endsWith(".gif")) {
-            return "image/gif";
-        }
-        if (lower.endsWith(".webp")) {
-            return "image/webp";
-        }
-        return "image/jpeg";
     }
 
     private static boolean differs(String submitted, String current) {
