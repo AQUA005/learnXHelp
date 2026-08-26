@@ -1,24 +1,10 @@
 import { useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { hasAtLeast, useSession } from '@/lib/session'
+import { Link, Outlet, useLocation } from 'react-router-dom'
+import { useSession } from '@/lib/session'
 import type { Role } from '@/lib/types'
+import { Icon } from '@/components/icons'
 import { initialsOf } from '@/components/ui'
-
-/** A destination, and the least privileged role that may see it. */
-type NavItem = { to: string; label: string; minimum: Role }
-
-const NAV_ITEMS: NavItem[] = [
-  { to: '/', label: 'Dashboard', minimum: 'STUDENT' },
-  { to: '/schedule', label: 'Class routine', minimum: 'STUDENT' },
-  { to: '/notes', label: 'Notes library', minimum: 'STUDENT' },
-  { to: '/announcements', label: 'Announcements', minimum: 'STUDENT' },
-  { to: '/exams', label: 'Exams', minimum: 'STUDENT' },
-  { to: '/performance', label: 'My results', minimum: 'STUDENT' },
-  { to: '/gradebook', label: 'Gradebook', minimum: 'TEACHER' },
-  { to: '/moderation', label: 'Note approvals', minimum: 'TEACHER' },
-  { to: '/admin', label: 'Administration', minimum: 'ADMIN' },
-  { to: '/profile', label: 'Profile', minimum: 'STUDENT' },
-]
+import { activeLabel, isNavItemActive, navigationFor } from './navigation'
 
 export default function AppShell() {
   const { user, signOut } = useSession()
@@ -27,9 +13,8 @@ export default function AppShell() {
 
   if (!user) return null
 
-  const visible = NAV_ITEMS.filter((item) => hasAtLeast(user.role, item.minimum))
-  const currentLabel =
-    visible.find((item) => item.to === location.pathname)?.label ?? 'LearnX'
+  const sections = navigationFor(user.role)
+  const currentLabel = activeLabel(sections, location.pathname, location.search) ?? 'LearnX'
 
   return (
     <div className="app-shell">
@@ -59,17 +44,29 @@ export default function AppShell() {
           </div>
         </div>
 
-        <nav className="sidebar-nav" aria-label="Sections">
-          {visible.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === '/'}
-              className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
-              onClick={() => setMenuOpen(false)}
-            >
-              {item.label}
-            </NavLink>
+        <nav className="sidebar-nav" aria-label={`${roleLabel(user.role)} sections`}>
+          {sections.map((section) => (
+            <div className="nav-section" key={section.title}>
+              <h2 className="nav-section-title">{section.title}</h2>
+              {section.items.map((item) => {
+                // Plain links rather than NavLink: several admin entries share
+                // a path and differ only by the view they open, which NavLink
+                // ignores when it decides which one is current.
+                const active = isNavItemActive(item, location.pathname, location.search)
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    className={active ? 'nav-link active' : 'nav-link'}
+                    aria-current={active ? 'page' : undefined}
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    <Icon name={item.icon} />
+                    <span>{item.label}</span>
+                  </Link>
+                )
+              })}
+            </div>
           ))}
         </nav>
 

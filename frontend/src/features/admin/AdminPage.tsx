@@ -1,35 +1,32 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { useToast } from '@/lib/toast'
 import { formatDateTime } from '@/lib/format'
 import type { MetadataOption, PendingUser } from '@/lib/types'
 import { Alert, Badge, Card, EmptyState, Field, Loading, PageHeader } from '@/components/ui'
-
-type Tab = 'approvals' | 'people' | 'classes' | 'metadata' | 'audit'
+import { ADMIN_TABS, VIEW_PARAM, adminTabFrom } from './tabs'
+import type { AdminTab } from './tabs'
 
 export default function AdminPage() {
-  const [tab, setTab] = useState<Tab>('approvals')
-
-  const tabs: { id: Tab; label: string }[] = [
-    { id: 'approvals', label: 'Account approvals' },
-    { id: 'people', label: 'People' },
-    { id: 'classes', label: 'Classes' },
-    { id: 'metadata', label: 'Dropdown options' },
-    { id: 'audit', label: 'Change history' },
-  ]
+  // Which screen is open lives in the address rather than in local state, so
+  // the sidebar can link straight to one and a reload stays where it was.
+  const [params, setParams] = useSearchParams()
+  const tab = adminTabFrom(params.get(VIEW_PARAM))
+  const show = (next: AdminTab) => setParams({ [VIEW_PARAM]: next }, { replace: true })
 
   return (
     <>
       <PageHeader title="Administration" description="Approvals, class groups and reference data." />
 
       <div className="row" style={{ marginBottom: '1rem' }}>
-        {tabs.map((entry) => (
+        {ADMIN_TABS.map((entry) => (
           <button
             key={entry.id}
             className={tab === entry.id ? 'btn btn-sm' : 'btn btn-secondary btn-sm'}
-            onClick={() => setTab(entry.id)}
+            onClick={() => show(entry.id)}
           >
             {entry.label}
           </button>
