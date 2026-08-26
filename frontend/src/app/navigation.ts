@@ -114,25 +114,30 @@ const NAVIGATION: Record<Role, NavSection[]> = {
       ],
     },
     ADMINISTRATION,
-    PROFILE,
-  ],
-
-  SYSTEM_ADMIN: [
-    {
-      title: 'Overview',
-      items: [
-        { to: '/', label: 'Home', icon: 'home' },
-        { to: '/schedule', label: 'Master routine', icon: 'calendar' },
-        { to: '/announcements', label: 'Global announcements', icon: 'megaphone' },
-      ],
-    },
-    ADMINISTRATION,
     {
       title: 'Academic oversight',
       items: [
         { to: '/gradebook', label: 'Gradebook', icon: 'gradebook' },
         { to: '/moderation', label: 'Note approvals', icon: 'shield' },
         { to: '/notes', label: 'Notes library', icon: 'folder' },
+        { to: '/exams', label: 'Exams', icon: 'exam' },
+      ],
+    },
+    PROFILE,
+  ],
+
+  /**
+   * A platform owner belongs to no university, so none of the class-scoped
+   * screens appear here at all: their endpoints resolve the caller's
+   * university and answer 403. They are not a super-administrator of one
+   * school; they run the service the schools sit on.
+   */
+  SYSTEM_ADMIN: [
+    {
+      title: 'Platform',
+      items: [
+        { to: '/', label: 'Home', icon: 'home' },
+        { to: '/platform', label: 'Platform', icon: 'platform' },
       ],
     },
     PROFILE,

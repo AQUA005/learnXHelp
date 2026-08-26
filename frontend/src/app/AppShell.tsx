@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useSession } from '@/lib/session'
+import { useBranding } from '@/lib/branding'
 import type { Role } from '@/lib/types'
 import { Icon } from '@/components/icons'
 import { initialsOf } from '@/components/ui'
@@ -8,13 +9,15 @@ import { activeLabel, isNavItemActive, navigationFor } from './navigation'
 
 export default function AppShell() {
   const { user, signOut } = useSession()
+  const branding = useBranding()
   const [menuOpen, setMenuOpen] = useState(false)
   const location = useLocation()
 
   if (!user) return null
 
   const sections = navigationFor(user.role)
-  const currentLabel = activeLabel(sections, location.pathname, location.search) ?? 'LearnX'
+  const currentLabel =
+    activeLabel(sections, location.pathname, location.search) ?? branding.siteName
 
   return (
     <div className="app-shell">
@@ -28,7 +31,13 @@ export default function AppShell() {
       )}
 
       <aside className={menuOpen ? 'sidebar open' : 'sidebar'}>
-        <div className="sidebar-brand">LearnX</div>
+        <div className="sidebar-brand">
+          {branding.logoUrl && <img className="brand-logo" src={branding.logoUrl} alt="" />}
+          <span>{branding.siteName}</span>
+        </div>
+
+        {/* Which school, as distinct from which product. */}
+        {user.university && <div className="sidebar-tenant small muted">{user.university.name}</div>}
 
         <div className="sidebar-user">
           {user.profilePicUrl ? (
@@ -44,7 +53,7 @@ export default function AppShell() {
           </div>
         </div>
 
-        <nav className="sidebar-nav" aria-label={`${roleLabel(user.role)} sections`}>
+        <nav className="sidebar-nav" aria-label="Sections">
           {sections.map((section) => (
             <div className="nav-section" key={section.title}>
               <h2 className="nav-section-title">{section.title}</h2>

@@ -54,10 +54,14 @@ class ScheduleIsolationTest {
         // installs @WithMockUser before this runs, so clearing would undo it.
         University university = universityRepository.findAll().stream().findFirst().orElseThrow();
 
+        // A fixture identity of this class's own. The suite shares one in-memory
+        // database and (university, batch, department, section) is unique, so
+        // reusing another test's values makes the outcome depend on which ran
+        // first.
         ownClass = studentClassRepository.save(StudentClass.builder()
-                .batch("Batch 21").department("CSE").section("Section A").university(university).build());
+                .batch("Batch 21").department("SCHEDULING").section("Section A").university(university).build());
         otherClass = studentClassRepository.save(StudentClass.builder()
-                .batch("Batch 21").department("CSE").section("Section B").university(university).build());
+                .batch("Batch 21").department("SCHEDULING").section("Section B").university(university).build());
 
         userRepository.save(User.builder()
                 .username("cr-a").password("x").fullName("Rep A").email("cr-a@ustc.test")

@@ -22,6 +22,7 @@ export type IconName =
   | 'classes'
   | 'options'
   | 'history'
+  | 'platform'
   | 'user'
 
 const PATHS: Record<IconName, ReactElement> = {
@@ -103,6 +104,13 @@ const PATHS: Record<IconName, ReactElement> = {
       <path d="M3.8 12a8.2 8.2 0 1 0 2.5-5.9" />
       <path d="M3.5 4.5V9H8" />
       <path d="M12 8v4.4l3 1.8" />
+    </>
+  ),
+  platform: (
+    <>
+      <path d="M4 20.5h16" />
+      <path d="M5.5 20.5V8.2L12 4.5l6.5 3.7v12.3" />
+      <path d="M9.5 20.5v-4.2h5v4.2M9.5 10.5h1.6M13 10.5h1.6M9.5 13.5h1.6M13 13.5h1.6" />
     </>
   ),
   user: (

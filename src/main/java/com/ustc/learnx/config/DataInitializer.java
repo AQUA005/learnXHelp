@@ -117,7 +117,8 @@ public class DataInitializer implements CommandLineRunner {
         StudentClass defaultClass = null;
 
         if (defaultUni != null) {
-            defaultClass = studentClassRepository.findByBatchAndDepartmentAndSection("Batch 21", "Computer Science & Engineering", "Section A")
+            defaultClass = studentClassRepository.findByUniversityAndBatchAndDepartmentAndSection(
+                            finalUni, "Batch 21", "Computer Science & Engineering", "Section A")
                     .orElseGet(() -> studentClassRepository.save(StudentClass.builder()
                             .batch("Batch 21")
                             .department("Computer Science & Engineering")

@@ -15,4 +15,6 @@ public interface SystemMetadataRepository extends JpaRepository<SystemMetadata, 
     List<SystemMetadata> findByType(String type);
     @EntityGraph(attributePaths = {"university"})
     List<SystemMetadata> findByTypeAndUniversity(String type, University university);
+
+    List<SystemMetadata> findByUniversity(University university);
 }

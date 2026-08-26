@@ -153,7 +153,10 @@ public class PasswordRecoveryController {
             return Optional.empty();
         }
         String trimmed = identifier.trim();
-        return userRepository.findByEmail(trimmed)
+        // Addresses are stored lower-cased, so recovery has to match that way
+        // or someone who typed their address with a capital would be told,
+        // indistinguishably, that no such account exists.
+        return userRepository.findByEmail(trimmed.toLowerCase(java.util.Locale.ROOT))
                 .or(() -> userRepository.findByUsername(trimmed))
                 .filter(u -> u.getEmail() != null && !u.getEmail().isBlank());
     }

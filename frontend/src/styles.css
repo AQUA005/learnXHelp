@@ -362,3 +362,89 @@ tbody tr:last-child td { border-bottom: none; }
   .skeleton { animation: none; }
   .sidebar { transition: none; }
 }
+
+/* --- Public site --- */
+/* The pages a visitor sees before signing in. Reuses the same tokens as the
+   signed-in app, so both follow the viewer's colour scheme without a second
+   palette to keep in step. */
+
+.public-shell { min-height: 100%; display: flex; flex-direction: column; }
+
+.public-header {
+  display: flex; align-items: center; gap: 1rem;
+  padding: 0.9rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.public-header nav { margin-left: auto; }
+
+.public-brand {
+  display: flex; align-items: center; gap: 0.6rem;
+  font-weight: 600; font-size: 1.05rem;
+  color: var(--text); text-decoration: none;
+}
+.public-brand-logo { height: 28px; width: auto; max-width: 140px; object-fit: contain; }
+
+.public-main { flex: 1; width: 100%; max-width: 1180px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+.public-footer {
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border);
+}
+.public-footer a { margin-left: auto; }
+
+.public-hero { max-width: 46rem; margin-bottom: 2rem; }
+.public-hero h1 { font-size: 1.9rem; margin-bottom: 0.5rem; }
+
+.uni-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+
+.uni-card {
+  display: flex; align-items: flex-start; gap: 0.9rem;
+  padding: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  color: var(--text); text-decoration: none;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.uni-card:hover, .uni-card:focus-visible { border-color: var(--accent); transform: translateY(-2px); }
+.uni-card-body p { margin-top: 0.25rem; }
+
+.uni-logo {
+  flex: none;
+  width: 44px; height: 44px;
+  display: grid; place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft); color: var(--accent);
+  font-weight: 600;
+  object-fit: contain;
+}
+.uni-logo-lg { width: 72px; height: 72px; font-size: 1.4rem; }
+
+.uni-head { display: flex; align-items: center; gap: 1.2rem; margin-bottom: 1.2rem; }
+.uni-head h1 { font-size: 1.6rem; }
+.uni-head p { margin-top: 0.35rem; max-width: 48rem; }
+
+/* Label/value pairs, as used by the contact panel. */
+.detail-list { display: grid; grid-template-columns: auto 1fr; gap: 0.4rem 1rem; }
+.detail-list dt { color: var(--text-muted); font-size: 0.84rem; }
+.detail-list dd { word-break: break-word; }
+
+@media (max-width: 860px) {
+  .public-main { padding: 1.25rem 1rem; }
+  .public-header { padding: 0.75rem 1rem; }
+  .uni-head { flex-direction: column; align-items: flex-start; gap: 0.8rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .uni-card { transition: none; }
+  .uni-card:hover, .uni-card:focus-visible { transform: none; }
+}
+
+/* --- Branding in the shell --- */
+
+.sidebar-brand { display: flex; align-items: center; gap: 0.5rem; }
+.brand-logo { height: 24px; width: auto; max-width: 120px; object-fit: contain; }
+.sidebar-tenant { padding: 0 0.25rem 0.6rem; }

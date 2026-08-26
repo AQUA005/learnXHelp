@@ -68,6 +68,15 @@ public class AdministratorBootstrap implements ApplicationRunner {
             return;
         }
 
+        // Required, not derived. People sign in with their email, so a fallback
+        // of username + "@learnx.local" would create an account whose sign-in
+        // address the operator never chose and cannot receive mail at.
+        if (email.isBlank()) {
+            log.error("LEARNX_ADMIN_EMAIL is not set. It is the address this account "
+                    + "signs in with, so it cannot be guessed. No account has been created.");
+            return;
+        }
+
         String policyError = PasswordPolicy.validate(password);
         if (policyError != null) {
             log.error("The bootstrap administrator password was rejected: {}. "
@@ -75,26 +84,25 @@ public class AdministratorBootstrap implements ApplicationRunner {
             return;
         }
 
-        Optional<University> university = universityRepository.findAll().stream().findFirst();
-        if (university.isEmpty()) {
-            log.error("No university exists, so the administrator cannot be attached to one. "
-                    + "Did the migrations run?");
-            return;
-        }
-
-        String address = email.isBlank() ? username + "@learnx.local" : email.trim();
+        String address = email.trim().toLowerCase(java.util.Locale.ROOT);
 
         userRepository.save(User.builder()
                 .username(username.trim())
                 .password(passwordEncoder.encode(password))
                 .fullName(fullName.isBlank() ? "LearnX Administrator" : fullName.trim())
                 .email(address)
-                .role(User.Role.ADMIN)
+                // The platform owner, not a university administrator, and
+                // attached to no university. This used to create an ADMIN bound
+                // to whichever university happened to be first, which left a
+                // fresh deployment with no way to create a second one: adding a
+                // university is a SYSTEM_ADMIN operation, and nothing outside
+                // the dev profile could produce that role.
+                .role(User.Role.SYSTEM_ADMIN)
                 .approved(true)
-                .university(university.get())
+                .university(null)
                 .build());
 
-        log.info("Created the first administrator '{}'. Sign in and change this password, "
-                + "then remove LEARNX_ADMIN_PASSWORD from the environment.", username.trim());
+        log.info("Created the platform owner. Sign in as '{}', change this password, "
+                + "then remove LEARNX_ADMIN_PASSWORD from the environment.", address);
     }
 }

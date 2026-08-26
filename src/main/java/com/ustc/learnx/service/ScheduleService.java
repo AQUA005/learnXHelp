@@ -220,11 +220,24 @@ public class ScheduleService {
 
     @Transactional(readOnly = true)
     public List<AuditLogResponse> listAuditLogs() {
-        return auditLogRepository.findAllByOrderByTimestampDesc().stream()
+        User user = currentUserService.requireCurrentUser();
+        // Scoped and capped. This used to return every row on the platform,
+        // unpaginated — one university's administrator could read another's
+        // audit trail, and the response grew without bound.
+        var page = org.springframework.data.domain.PageRequest.of(0, AUDIT_LOG_PAGE_SIZE);
+        var entries = user.getRole() == User.Role.SYSTEM_ADMIN
+                ? auditLogRepository.findAllByOrderByTimestampDesc(page)
+                : auditLogRepository.findByUniversity_IdOrderByTimestampDesc(
+                        currentUserService.requireUniversityId(), page);
+
+        return entries.getContent().stream()
                 .map(a -> new AuditLogResponse(a.getId(), a.getEntityType(), a.getEntityId(),
                         a.getAction(), a.getChangedBy(), a.getTimestamp(), a.getDetails()))
                 .toList();
     }
+
+    /** The audit screen shows a recent window, not the whole history. */
+    private static final int AUDIT_LOG_PAGE_SIZE = 100;
 
     // --- Class resolution ---
 
@@ -305,6 +318,9 @@ public class ScheduleService {
                 .changedBy(user.getUsername())
                 .timestamp(LocalDateTime.now())
                 .details(details)
+                // Stamped with the actor's university, or the entry would not
+                // appear in that university's own audit trail.
+                .university(user.getUniversity())
                 .build());
     }
 

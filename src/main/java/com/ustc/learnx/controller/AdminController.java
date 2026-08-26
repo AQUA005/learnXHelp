@@ -13,6 +13,7 @@ import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.SecureRandom;
@@ -38,6 +39,7 @@ public class AdminController {
     private final CurrentUserService currentUserService;
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
+    private final com.ustc.learnx.service.ClassPlacementService classPlacementService;
 
     /** Accounts awaiting approval, scoped to the caller's university. */
     @GetMapping("/pending")
@@ -75,10 +77,21 @@ public class AdminController {
         return ResponseEntity.ok(people);
     }
 
+    /**
+     * Approves an account and places it in its class.
+     *
+     * <p>The placement is the part that was missing. Approving used to set the
+     * flag and nothing else, so a student approved from the administration
+     * screen belonged to no class — and the routine, notes, announcements and
+     * class tests are all scoped to one, so every such screen stayed empty for
+     * them with nothing to explain it.
+     */
     @PostMapping("/approve/{id}")
+    @Transactional
     public ResponseEntity<?> approveUser(@PathVariable Long id) {
         User user = requireUserInOwnUniversity(id);
         user.setApproved(true);
+        classPlacementService.place(user);
         userRepository.save(user);
         auditService.record("ACCOUNT", "APPROVE", currentUserService.requireCurrentUser().getUsername(),
                 "Approved the account '" + user.getUsername() + "'");
@@ -142,10 +155,12 @@ public class AdminController {
         auditService.record("ACCOUNT", "RESET_PASSWORD", actor.getUsername(),
                 "Reset the password for '" + target.getUsername() + "'");
 
+        // The email, not the username: that is what they sign in with, and the
+        // username is generated and never shown to them.
         return ResponseEntity.ok(Map.of(
                 "message", "Password reset. Give this to " + target.getFullName()
                         + ", and ask them to change it after signing in.",
-                "username", target.getUsername(),
+                "email", target.getEmail(),
                 "password", password));
     }
 

@@ -14,7 +14,8 @@ type SessionState = {
   user: CurrentUser | null
   /** True until the first check of the existing session completes. */
   loading: boolean
-  signIn: (username: string, password: string) => Promise<void>
+  /** Email is the credential; the username is generated and never typed. */
+  signIn: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
   refresh: () => Promise<void>
   /** Applies a local change, such as a new avatar, without a round trip. */
@@ -51,9 +52,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [refresh])
 
-  const signIn = useCallback(async (username: string, password: string) => {
-    // The response is the signed-in user, so no second request is needed.
-    setUser(await api.post<CurrentUser>('/api/auth/login', { username, password }))
+  const signIn = useCallback(async (email: string, password: string) => {
+    // The response is the signed-in user, so no second request is needed —
+    // which is why anything added to it must be added to both of the server's
+    // UserResponse construction paths.
+    setUser(await api.post<CurrentUser>('/api/auth/login', { email, password }))
   }, [])
 
   const signOut = useCallback(async () => {
