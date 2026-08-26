@@ -142,17 +142,20 @@ public class SecurityConfig {
                 .requestMatchers(PUBLIC_ASSETS).permitAll()
                 // GET only: these resolve to the shell, and nothing is ever
                 // written through them.
-                .requestMatchers(org.springframework.http.HttpMethod.GET, SPA_ROUTES).permitAll()
+                .requestMatchers(HttpMethod.GET, SPA_ROUTES).permitAll()
                 .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                 // The signup form is filled in before a session exists, and its
                 // department, semester, batch, section and designation fields
-                // are dropdowns driven by this list. Without anonymous read
-                // access the request comes back 401, the lists arrive empty,
-                // and the form silently degrades to free-text boxes that accept
-                // anything at all. Reading is public; adding and removing
-                // entries still requires an administrator, which is enforced by
-                // @PreAuthorize on MetadataController.
-                .requestMatchers(HttpMethod.GET, "/api/metadata").permitAll()
+                // are dropdowns driven by that reference data. Without anonymous
+                // read access the request comes back 401, the lists arrive
+                // empty, and the form degrades to free-text boxes that accept
+                // anything at all.
+                //
+                // It is served by /api/public/universities/{slug}/metadata,
+                // covered by PUBLIC_ENDPOINTS above, rather than by opening
+                // /api/metadata: the signup form knows which university it is
+                // for, and the unscoped endpoint would answer an anonymous
+                // caller with every university's reference data at once.
                 // Everything else — including /api/admin/** and /api/master/**,
                 // which were previously permitAll — needs a session. Role
                 // requirements are enforced by @PreAuthorize on the controllers.

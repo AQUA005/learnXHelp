@@ -127,8 +127,8 @@ class EmailLoginTest {
     private String signup(String slug, String email) {
         return """
                 {"universitySlug":"%s","password":"password1","fullName":"New Person",
-                 "email":"%s","role":"STUDENT","idNo":"77","department":"CSE",
-                 "batch":"Batch 21","semester":"1st Year 1st Semester","section":"Section A"}"""
+                 "email":"%s","role":"STUDENT","idNo":"77","department":"CSE - Computer Science & Engineering",
+                 "batch":"Batch 21","semester":"1st Semester","section":"Section A"}"""
                 .formatted(slug, email);
     }
 
@@ -185,6 +185,30 @@ class EmailLoginTest {
                         org.hamcrest.Matchers.containsString("not open for registration")));
 
         assertThat(userRepository.findByEmail("hopeful@draft.test")).isEmpty();
+    }
+
+    /**
+     * The dropdown values are checked against the list the named university
+     * publishes, not against every university's at once. A request posted
+     * straight at the API carries whatever the sender chose, and a department
+     * that belongs to a different institution matches no class here.
+     */
+    @Test
+    void aDepartmentFromAnotherUniversityIsRefused() throws Exception {
+        String body = """
+                {"universitySlug":"%s","password":"password1","fullName":"Wrong Place",
+                 "email":"wrong.place@example.test","role":"STUDENT","idNo":"78",
+                 "department":"Department Of Somewhere Else","batch":"Batch 21",
+                 "semester":"1st Semester","section":"Section A"}"""
+                .formatted(published.getSlug());
+
+        mvc.perform(post("/api/auth/signup").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(
+                        org.hamcrest.Matchers.containsString("Department")));
+
+        assertThat(userRepository.findByEmail("wrong.place@example.test")).isEmpty();
     }
 
     @Test
