@@ -3,6 +3,7 @@ package com.ustc.learnx.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
@@ -126,6 +127,15 @@ public class SecurityConfig {
                 .requestMatchers("/actuator/**").hasRole("ADMIN")
                 .requestMatchers(PUBLIC_ASSETS).permitAll()
                 .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+                // The signup form is filled in before a session exists, and its
+                // department, semester, batch, section and designation fields
+                // are dropdowns driven by this list. Without anonymous read
+                // access the request comes back 401, the lists arrive empty,
+                // and the form silently degrades to free-text boxes that accept
+                // anything at all. Reading is public; adding and removing
+                // entries still requires an administrator, which is enforced by
+                // @PreAuthorize on MetadataController.
+                .requestMatchers(HttpMethod.GET, "/api/metadata").permitAll()
                 // Everything else — including /api/admin/** and /api/master/**,
                 // which were previously permitAll — needs a session. Role
                 // requirements are enforced by @PreAuthorize on the controllers.

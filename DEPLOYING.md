@@ -304,10 +304,34 @@ in Render under **Environment**:
 | Key | Value |
 |---|---|
 | `SPRING_MAIL_HOST` | The SMTP host they give you |
-| `SPRING_MAIL_PORT` | `587` |
+| `SPRING_MAIL_PORT` | `2525` on Render — see below. `587` anywhere else |
 | `SPRING_MAIL_USERNAME` | The username they give you |
 | `SPRING_MAIL_PASSWORD` | The password or API key they give you |
 | `LEARNX_MAIL_FROM` | The address recipients should see — see below |
+
+### The port matters on Render
+
+Render blocks outgoing connections on the usual mail ports — **25, 465 and
+587** — on its free instance types. Nothing in the application reports this
+as a blocked port, because a blocked port does not refuse the connection, it
+swallows it. The attempt simply hangs until it gives up, and the log says:
+
+```
+Couldn't connect to host, port: smtp-relay.brevo.com, 587; timeout 5000;
+nested exception is: java.net.SocketTimeoutException: Connect timed out
+```
+
+If you see that, the credentials are almost certainly fine. Two ways out:
+
+1. **Use port 2525.** Brevo, SMTP2GO, Mailjet and Mailgun all accept
+   submissions on 2525 for exactly this reason, and Render does not block it.
+   Set `SPRING_MAIL_PORT` to `2525` and redeploy. Try this first: it is one
+   environment variable and no code.
+2. **Move to a paid instance type**, where the block does not apply, and keep
+   port 587.
+
+Resend has no 2525 port, so on a free Render instance choose one of the
+providers above instead.
 
 Providers come in two kinds, and they differ in one respect.
 
