@@ -23,6 +23,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByUsername(String username);
     Optional<User> findByEmail(String email);
     boolean existsByUsername(String username);
+
+    /** Whether anybody holds a role. Used to detect a deployment with no owner. */
+    boolean existsByRole(User.Role role);
     boolean existsByEmail(String email);
     @EntityGraph(attributePaths = {"studentClass", "university"})
     java.util.List<User> findByUniversityAndRole(University university, User.Role role);

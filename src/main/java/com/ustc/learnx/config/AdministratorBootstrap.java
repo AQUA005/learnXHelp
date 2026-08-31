@@ -26,8 +26,15 @@ import java.util.Optional;
  * sign in, and although anyone may sign up, every new account needs an
  * administrator to approve it. Without this the deployment would be unusable.
  *
- * <p>Runs only when the table is empty, so it cannot alter or overwrite an
- * existing account, and is a no-op on every subsequent start.
+ * <p>Also repairs the one deployment state this cannot otherwise recover from.
+ * An earlier version of this class created the bootstrap account as an
+ * {@code ADMIN} of whichever university happened to be first. That was
+ * corrected to {@code SYSTEM_ADMIN}, but only for a deployment starting with an
+ * empty table — an existing installation kept the account it already had, and
+ * since nothing outside the dev profile can mint a {@code SYSTEM_ADMIN}, it was
+ * left with no platform owner and therefore no way to add a second university.
+ * Where no platform owner exists at all, the configured address is promoted to
+ * one.
  */
 @Component
 @Profile("!dev")
@@ -56,7 +63,10 @@ public class AdministratorBootstrap implements ApplicationRunner {
     @Transactional
     public void run(org.springframework.boot.ApplicationArguments args) {
         if (userRepository.count() > 0) {
-            // Somebody can already sign in; never touch existing accounts.
+            // Somebody can already sign in, so no account is created here. The
+            // deployment may still have no owner, which is the one thing it
+            // cannot fix from inside the application.
+            promoteConfiguredOwnerIfNoneExists();
             return;
         }
 
@@ -104,5 +114,52 @@ public class AdministratorBootstrap implements ApplicationRunner {
 
         log.info("Created the platform owner. Sign in as '{}', change this password, "
                 + "then remove LEARNX_ADMIN_PASSWORD from the environment.", address);
+    }
+
+    /**
+     * Gives a deployment that has no platform owner one.
+     *
+     * <p>Deliberately narrow, because promoting an account is an escalation.
+     * It happens only when there is no {@code SYSTEM_ADMIN} anywhere — in which
+     * case the deployment is already unable to add a university, so there is no
+     * working state to damage — and only to the address the operator has named
+     * in the environment, which is the same address this class would have
+     * created the owner at.
+     *
+     * <p>The password is not touched. The account can already be signed into,
+     * and rewriting it on every restart from an environment variable would
+     * undo whatever the owner had since changed it to.
+     */
+    private void promoteConfiguredOwnerIfNoneExists() {
+        if (userRepository.existsByRole(User.Role.SYSTEM_ADMIN)) {
+            return;
+        }
+
+        if (email.isBlank()) {
+            log.warn("""
+                    This deployment has no platform owner, so no university can be                     added. Set LEARNX_ADMIN_EMAIL to the address that should own it                     and restart.""");
+            return;
+        }
+
+        String address = email.trim().toLowerCase(java.util.Locale.ROOT);
+        Optional<User> candidate = userRepository.findByEmail(address);
+        if (candidate.isEmpty()) {
+            log.error("This deployment has no platform owner, and no account has the "
+                    + "configured address '{}'. Nothing has been changed.", address);
+            return;
+        }
+
+        User owner = candidate.get();
+        User.Role was = owner.getRole();
+        owner.setRole(User.Role.SYSTEM_ADMIN);
+        // A platform owner sits above every university rather than inside one.
+        // While this points at a university, every tenant-scoped screen resolves
+        // that university and answers as though they administered only it.
+        owner.setUniversity(null);
+        userRepository.save(owner);
+
+        log.warn("Promoted '{}' from {} to the platform owner, because this deployment "
+                + "had none. Any university it administered now has no administrator; "
+                + "set one from the platform console.", address, was);
     }
 }
