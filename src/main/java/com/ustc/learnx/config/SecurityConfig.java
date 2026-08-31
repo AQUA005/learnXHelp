@@ -37,6 +37,9 @@ public class SecurityConfig {
     /** Files served from the jar. Each contains a dot, so none is a client route. */
     private static final String[] PUBLIC_ASSETS = {
             "/", "/index.html", "/favicon.ico",
+            // Resolves the stored theme before the first paint, so it is
+            // requested by the shell itself, before anybody has signed in.
+            "/theme-boot.js",
             "/assets/**", "/learnx_logo.png", "/ustc_building.jpg"
     };
 
@@ -113,9 +116,13 @@ public class SecurityConfig {
                         "default-src 'self'; "
                         + "script-src 'self'; "
                         // Inline styles remain allowed because the client sets a
-                        // few computed values as element styles.
-                        + "style-src 'self' 'unsafe-inline'; "
-                        + "font-src 'self'; "
+                        // few computed values as element styles. The Google Fonts
+                        // hosts are named because the interface asks for Space
+                        // Grotesk and Outfit from them: the stylesheet comes from
+                        // googleapis, the font files it names from gstatic, and
+                        // without both the type silently falls back.
+                        + "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+                        + "font-src 'self' https://fonts.gstatic.com; "
                         + "img-src 'self' data:; "
                         + "connect-src 'self'; "
                         + "object-src 'none'; "

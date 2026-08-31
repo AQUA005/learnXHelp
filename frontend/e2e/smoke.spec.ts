@@ -199,6 +199,48 @@ test('each role gets its own navigation, not a longer one', async ({ page }) => 
   await expect(current).toHaveText('Change history')
 })
 
+test('the routine screen reads the sheet, and says so', async ({ page }) => {
+  await signIn(page, 'student@learnx.help')
+  await page.getByRole('link', { name: 'Class routine' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Class routine' })).toBeVisible()
+
+  // The whole week is offered, whatever the sheet turns out to hold.
+  await expect(page.getByRole('button', { name: /Wednesday/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Refresh' })).toBeVisible()
+
+  // And the screen always states where its data stands: live, a saved copy, or
+  // not configured. Asserted as a set so the test does not depend on whether
+  // the machine running it can reach Google.
+  await expect(page.locator('.routine-status')).toContainText(
+    /Live|Saved copy|No sheet configured|could not be read|Reading the sheet/,
+  )
+})
+
+test('a class representative can cancel a class for the whole class', async ({ page }) => {
+  await signIn(page, 'cr@learnx.help')
+  await page.goto('/schedule')
+
+  await page.getByRole('button', { name: 'Post a change' }).click()
+  // Scoped to the dialog throughout: the screen behind it has its own course
+  // and time fields, for the classes a class keeps in LearnX itself.
+  const dialog = page.getByRole('dialog', { name: 'Post a change' })
+  await expect(dialog).toBeVisible()
+
+  // Adding is always possible, even on a date the sheet has nothing for, so it
+  // is the part that can be asserted without depending on the sheet's content.
+  await dialog.getByLabel('Course').fill('CSE 9999')
+  await dialog.getByRole('button', { name: 'Post to my class' }).click()
+
+  await expect(page.getByText('Posted to your class')).toBeVisible()
+  const posted = dialog.locator('.routine-manage-row').filter({ hasText: 'CSE 9999' })
+  await expect(posted).toBeVisible()
+
+  // And withdrawing it leaves the class where it started.
+  await posted.getByRole('button', { name: 'Withdraw' }).click()
+  await expect(page.getByText('Change withdrawn')).toBeVisible()
+  await expect(dialog.locator('.routine-manage-row').filter({ hasText: 'CSE 9999' })).toHaveCount(0)
+})
+
 test('the theme is the viewer\'s choice, and it is remembered', async ({ page }) => {
   await signIn(page, 'student@learnx.help')
 

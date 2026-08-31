@@ -7,6 +7,7 @@ import { useToast } from '@/lib/toast'
 import { formatDateTime } from '@/lib/format'
 import type { MetadataOption, PendingUser } from '@/lib/types'
 import { Alert, Badge, Card, EmptyState, Field, Loading, PageHeader } from '@/components/ui'
+import RoutineSources from './RoutineSources'
 import { ADMIN_TABS, VIEW_PARAM, adminTabFrom } from './tabs'
 import type { AdminTab } from './tabs'
 
@@ -36,6 +37,7 @@ export default function AdminPage() {
       {tab === 'approvals' && <Approvals />}
       {tab === 'people' && <People />}
       {tab === 'classes' && <Classes />}
+      {tab === 'routine' && <RoutineSources />}
       {tab === 'metadata' && <Metadata />}
       {tab === 'audit' && <AuditTrail />}
     </>

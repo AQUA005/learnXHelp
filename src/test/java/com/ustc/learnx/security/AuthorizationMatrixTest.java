@@ -123,6 +123,10 @@ class AuthorizationMatrixTest {
             "GET,    /api/mail/users",
             "POST,   /api/mail/send",
             "GET,    /api/schedule/audit-logs",
+            "GET,    /api/routine/live",
+            "GET,    /api/routine/sources",
+            "PUT,    /api/routine/sources",
+            "POST,   /api/routine/overrides",
             "GET,    /api/resources/pending",
             "POST,   /api/bugs/report",
             "GET,    /api/auth/current-user",
@@ -224,6 +228,10 @@ class AuthorizationMatrixTest {
             "GET,    /api/schedule/audit-logs",
             "POST,   /api/schedule/routine",
             "POST,   /api/schedule/ct",
+            "GET,    /api/routine/sources",
+            "PUT,    /api/routine/sources",
+            "POST,   /api/routine/overrides",
+            "DELETE, /api/routine/overrides/1",
             "GET,    /api/resources/pending",
             "POST,   /api/resources/1/approve",
             "POST,   /api/exams/create",
@@ -348,7 +356,9 @@ class AuthorizationMatrixTest {
             "title":"t","content":"c","courseName":"c","type":"DEPARTMENT","value":"v",\
             "dayOfWeek":"MONDAY","startTime":"10:00:00","endTime":"11:00:00",\
             "dateTime":"2026-09-01T10:00:00","studentUsername":"student",\
-            "assessmentName":"CT 1","to":"student@ustc.test","subject":"s","body":"b"}""";
+            "assessmentName":"CT 1","to":"student@ustc.test","subject":"s","body":"b",\r
+            "sheet":"1vPpOGcZH6LIJ23h","dayGids":"1738789421","kind":"CANCELLED",\r
+            "date":"2026-09-01","targetKey":"8:30-10:00|cse3101"}""";
 
     /**
      * Exams carry their times as ISO date-time strings, where a schedule item

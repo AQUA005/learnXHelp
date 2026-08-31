@@ -24,27 +24,12 @@
     />
     <title>LearnX</title>
     <!--
-      The theme is resolved before the first paint, not after React mounts.
-      Reading the stored choice here is what stops someone who has chosen dark
-      from seeing a white page for as long as the bundle takes to arrive.
-      `system` follows the machine, and the application keeps this attribute in
-      step from then on.
+      The theme is resolved before the first paint, not after React mounts, so
+      somebody who has chosen dark never sees a white page while the bundle
+      arrives. Blocking and same-origin on purpose: the Content-Security-Policy
+      is script-src 'self', which an inline snippet would force us to weaken.
     -->
-    <script>
-      (function () {
-        try {
-          var choice = localStorage.getItem('learnx.theme') || 'system'
-          var dark =
-            choice === 'dark' ||
-            (choice === 'system' &&
-              window.matchMedia('(prefers-color-scheme: dark)').matches)
-          document.documentElement.dataset.theme = dark ? 'dark' : 'light'
-        } catch (error) {
-          // A browser with storage blocked still gets the light theme.
-          document.documentElement.dataset.theme = 'light'
-        }
-      })()
-    </script>
+    <script src="/theme-boot.js"></script>
   </head>
   <body>
     <div id="root"></div>

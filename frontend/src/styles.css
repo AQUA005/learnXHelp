@@ -19,54 +19,59 @@
 :root {
   color-scheme: light;
 
-  /* The ground the whole application sits on. */
-  --ground: #ccd0cf;
-  --ground-deep: #9ba8ab;
+  /* The ground the whole application sits on: Aurora, from the routine tool.
+     A pale blue sheet with coloured light moving slowly behind it. */
+  --ground: #eef1f8;
+  --ground-deep: #dbe3f5;
 
   /* The washes and blobs behind everything, as tokens so the two themes
      differ in one block rather than in every rule that paints them. */
-  --wash-1: rgb(255 255 255 / 60%);
-  --wash-2: rgb(158 198 216 / 26%);
-  --blob-1-color: #8fb6c6;
-  --blob-2-color: #9ba8ab;
-  --blob-3-color: #4a5c6a;
-  --blob-opacity: 0.24;
-  --blob-3-opacity: 0.16;
+  --wash-1: rgb(255 255 255 / 70%);
+  --wash-2: rgb(188 210 255 / 45%);
+  --blob-1-color: #bcd2ff;
+  --blob-2-color: #e6d3ff;
+  --blob-3-color: #c7f4e6;
+  --blob-4-color: #ffe6c9;
+  --blob-5-color: #d9e0ff;
+  --blob-opacity: 0.62;
 
   /* Panels. Glass is translucent and blurred; panel is solid, for dense text. */
-  --glass: rgb(255 255 255 / 30%);
-  --glass-hover: rgb(255 255 255 / 44%);
-  --glass-border: rgb(255 255 255 / 46%);
-  --glass-border-lit: rgb(255 255 255 / 68%);
-  --panel: rgb(255 255 255 / 88%);
-  --panel-muted: rgb(255 255 255 / 55%);
+  --glass: rgb(255 255 255 / 55%);
+  --glass-hover: rgb(255 255 255 / 70%);
+  --glass-border: rgb(255 255 255 / 85%);
+  --glass-border-lit: rgb(255 255 255 / 95%);
+  --panel: rgb(255 255 255 / 92%);
+  --panel-muted: rgb(255 255 255 / 60%);
+  /* The sweep of light that crosses a glass panel. */
+  --sheen: rgb(255 255 255 / 55%);
 
   --surface: var(--glass);
-  --surface-muted: rgb(255 255 255 / 40%);
-  --border: rgb(6 20 27 / 12%);
+  --surface-muted: rgb(255 255 255 / 55%);
+  --border: rgb(90 105 140 / 16%);
 
-  --text: #06141b;
-  --text-strong: #06141b;
-  --text-muted: #4a5c6a;
+  --text: #1a2030;
+  --text-strong: #10162a;
+  --text-muted: #5c6576;
 
-  --accent: #11212d;
+  --accent: #3b74ff;
   --accent-contrast: #ffffff;
-  --accent-soft: rgb(17 33 45 / 10%);
+  --accent-soft: rgb(59 116 255 / 12%);
+  --accent-glow: rgb(59 116 255 / 35%);
 
-  --success: #12694a;
-  --success-soft: rgb(18 105 74 / 12%);
-  --warning: #8a5300;
-  --warning-soft: rgb(138 83 0 / 12%);
-  --danger: #a32a20;
-  --danger-soft: rgb(163 42 32 / 12%);
+  --success: #12784f;
+  --success-soft: rgb(18 120 79 / 12%);
+  --warning: #9a6207;
+  --warning-soft: rgb(154 98 7 / 14%);
+  --danger: #c02a2f;
+  --danger-soft: rgb(192 42 47 / 12%);
 
-  --radius: 20px;
-  --radius-sm: 12px;
+  --radius: 22px;
+  --radius-sm: 13px;
   --radius-pill: 999px;
 
-  --shadow: 0 8px 32px rgb(6 20 27 / 6%), inset 0 1px 0 rgb(255 255 255 / 40%);
-  --shadow-lifted: 0 16px 40px -10px rgb(6 20 27 / 14%), inset 0 1px 0 rgb(255 255 255 / 55%);
-  --blur: blur(26px) saturate(180%);
+  --shadow: 0 10px 34px rgb(40 55 95 / 12%), inset 0 1px 0 rgb(255 255 255 / 75%);
+  --shadow-lifted: 0 16px 44px -10px rgb(40 55 95 / 20%), inset 0 1px 0 rgb(255 255 255 / 90%);
+  --blur: blur(28px) saturate(190%);
 
   --sidebar-width: 268px;
 
@@ -74,48 +79,52 @@
   --font-display: "Space Grotesk", "Outfit", "Segoe UI", system-ui, sans-serif;
 }
 
+/* Aurora after dark: the same light, further away. */
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --ground: #06141b;
-  --ground-deep: #11212d;
+  --ground: #0b1020;
+  --ground-deep: #141c38;
 
-  --wash-1: rgb(37 55 69 / 85%);
-  --wash-2: rgb(17 33 45 / 90%);
-  --blob-1-color: #1d4a5e;
-  --blob-2-color: #253745;
-  --blob-3-color: #11212d;
-  --blob-opacity: 0.34;
-  --blob-3-opacity: 0.4;
+  --wash-1: rgb(38 53 107 / 70%);
+  --wash-2: rgb(58 42 99 / 55%);
+  --blob-1-color: #26356b;
+  --blob-2-color: #3a2a63;
+  --blob-3-color: #1d4b46;
+  --blob-4-color: #4a3a20;
+  --blob-5-color: #232c5c;
+  --blob-opacity: 0.5;
 
-  --glass: rgb(255 255 255 / 7%);
-  --glass-hover: rgb(255 255 255 / 12%);
-  --glass-border: rgb(255 255 255 / 14%);
+  --glass: rgb(28 35 60 / 58%);
+  --glass-hover: rgb(38 47 78 / 72%);
+  --glass-border: rgb(255 255 255 / 13%);
   --glass-border-lit: rgb(255 255 255 / 26%);
-  --panel: rgb(17 33 45 / 92%);
-  --panel-muted: rgb(17 33 45 / 65%);
+  --panel: rgb(21 27 48 / 92%);
+  --panel-muted: rgb(21 27 48 / 65%);
+  --sheen: rgb(255 255 255 / 13%);
 
   --surface: var(--glass);
   --surface-muted: rgb(255 255 255 / 9%);
-  --border: rgb(204 208 207 / 16%);
+  --border: rgb(255 255 255 / 12%);
 
-  --text: #ccd0cf;
-  --text-strong: #eef1f0;
-  --text-muted: #9ba8ab;
+  --text: #e9eefc;
+  --text-strong: #f4f7ff;
+  --text-muted: #9aa4be;
 
-  --accent: #9ec6d8;
-  --accent-contrast: #06141b;
-  --accent-soft: rgb(158 198 216 / 16%);
+  --accent: #7aa2ff;
+  --accent-contrast: #0b1020;
+  --accent-soft: rgb(122 162 255 / 16%);
+  --accent-glow: rgb(122 162 255 / 35%);
 
-  --success: #5fd39a;
-  --success-soft: rgb(95 211 154 / 16%);
-  --warning: #e6b45c;
-  --warning-soft: rgb(230 180 92 / 16%);
-  --danger: #f0806f;
-  --danger-soft: rgb(240 128 111 / 16%);
+  --success: #4fd39a;
+  --success-soft: rgb(79 211 154 / 16%);
+  --warning: #eab766;
+  --warning-soft: rgb(234 183 102 / 16%);
+  --danger: #ff7b7f;
+  --danger-soft: rgb(255 123 127 / 16%);
 
-  --shadow: 0 10px 34px rgb(0 0 0 / 34%), inset 0 1px 0 rgb(255 255 255 / 6%);
-  --shadow-lifted: 0 20px 46px -12px rgb(0 0 0 / 46%), inset 0 1px 0 rgb(255 255 255 / 10%);
+  --shadow: 0 14px 40px rgb(0 0 0 / 46%), inset 0 1px 0 rgb(255 255 255 / 7%);
+  --shadow-lifted: 0 20px 50px -12px rgb(0 0 0 / 58%), inset 0 1px 0 rgb(255 255 255 / 12%);
 }
 
 * { box-sizing: border-box; }
@@ -178,12 +187,11 @@ a { color: var(--accent); }
   opacity: var(--blob-opacity);
   animation: float 26s ease-in-out infinite alternate;
 }
-.blob-1 { top: -16%; left: 2%; width: 42vw; height: 42vw; background: var(--blob-1-color); }
-.blob-2 { bottom: -22%; right: -4%; width: 38vw; height: 38vw; background: var(--blob-2-color); animation-delay: -9s; }
-.blob-3 {
-  top: 58%; left: 34%; width: 26vw; height: 26vw;
-  background: var(--blob-3-color); animation-delay: -18s; opacity: var(--blob-3-opacity);
-}
+.blob-1 { top: -10%; left: -8%; width: 48vw; height: 48vw; background: var(--blob-1-color); }
+.blob-2 { top: 6%; right: -12%; width: 42vw; height: 42vw; background: var(--blob-2-color); animation-delay: -7s; }
+.blob-3 { bottom: -12%; left: 4%; width: 46vw; height: 46vw; background: var(--blob-3-color); animation-delay: -13s; }
+.blob-4 { bottom: 4%; right: 0; width: 32vw; height: 32vw; background: var(--blob-4-color); animation-delay: -19s; }
+.blob-5 { top: 40%; left: 34%; width: 38vw; height: 38vw; background: var(--blob-5-color); animation-delay: -24s; }
 
 @keyframes float {
   from { transform: translate3d(0, 0, 0) scale(1); }
@@ -362,6 +370,8 @@ a { color: var(--accent); }
 /* --- Surfaces --- */
 
 .card {
+  position: relative;
+  overflow: hidden;
   background:
     linear-gradient(155deg, rgb(255 255 255 / 24%), transparent 46%),
     var(--glass);
@@ -374,6 +384,28 @@ a { color: var(--accent); }
   transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
 }
 .card:hover { border-color: var(--glass-border-lit); box-shadow: var(--shadow-lifted); }
+
+/* The light that crosses a pane of glass. Transform only, so it composites on
+   its own layer and never repaints the card underneath it. */
+.card::before,
+.hero-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 55%;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 0%, var(--sheen) 50%, transparent 100%);
+  transform: translateX(-130%) skewX(-18deg);
+  animation: sheen 9s ease-in-out infinite;
+  opacity: 0.7;
+}
+@keyframes sheen {
+  0% { transform: translateX(-130%) skewX(-18deg); }
+  55%, 100% { transform: translateX(320%) skewX(-18deg); }
+}
+
+/* The card's own content sits above the sweep. */
+.card > * { position: relative; }
 
 .card + .card { margin-top: 1rem; }
 
@@ -794,4 +826,191 @@ tbody tr:hover td { background: var(--surface-muted); }
   .sidebar { transition: none; }
   .card, .btn, .nav-link, .uni-card, .toast { transition: none; animation: none; }
   .btn:hover:not(:disabled), .uni-card:hover, .nav-link:hover { transform: none; }
+}
+
+/* --- The live routine --- */
+/* Ported from the standalone routine tool: today leads, with what is on now
+   and how much of it is left, and the rest of the week sits underneath. */
+
+.routine-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem;
+}
+
+.routine-status {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  font-size: 0.82rem; font-weight: 500; color: var(--text-muted);
+}
+.routine-status .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent); flex: none;
+  animation: routine-pulse 2.4s infinite;
+}
+.routine-status.stale .dot { background: var(--warning); animation: none; }
+.routine-status.err .dot { background: var(--danger); animation: none; }
+@keyframes routine-pulse {
+  0% { box-shadow: 0 0 0 0 var(--accent-soft); }
+  70% { box-shadow: 0 0 0 7px rgb(0 0 0 / 0%); }
+  100% { box-shadow: 0 0 0 0 rgb(0 0 0 / 0%); }
+}
+
+.routine-hero { margin-bottom: 1.5rem; }
+.routine-hero-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 0.75rem; margin-bottom: 0.4rem;
+}
+.routine-hero-head h2 { margin: 0; text-transform: capitalize; }
+.routine-banner { color: var(--text-muted); padding: 0.75rem 0 0.25rem; margin: 0; }
+
+.routine-tag {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  font-size: 0.64rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--accent-contrast); background: var(--accent);
+  border-radius: var(--radius-pill); padding: 0.2rem 0.65rem;
+  margin: 0.7rem 0 0.35rem;
+}
+
+.routine-class {
+  display: flex; gap: 0.9rem; align-items: flex-start;
+  padding: 0.8rem 0.25rem;
+  border-top: 1px solid var(--border);
+}
+.routine-class:first-of-type { border-top: none; }
+.routine-time {
+  flex: 0 0 5.4rem; padding-top: 0.15rem;
+  font-size: 0.78rem; font-weight: 600; color: var(--text-muted); line-height: 1.35;
+}
+.routine-body { flex: 1; min-width: 0; }
+.routine-course {
+  display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;
+  font-family: var(--font-display); font-weight: 600; font-size: 0.98rem;
+}
+.routine-meta {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem;
+  margin-top: 0.3rem; color: var(--text-muted);
+}
+.routine-room {
+  display: inline-flex; align-items: center;
+  background: var(--surface-muted); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--radius-pill);
+  padding: 0.1rem 0.55rem; font-size: 0.74rem; font-weight: 600;
+}
+
+/* The class happening right now, marked without moving anything around it. */
+.routine-class.now {
+  margin: 0 -0.75rem; padding-left: 0.9rem; padding-right: 0.75rem;
+  border-top-color: transparent;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--accent-soft), transparent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.routine-class.cancelled { opacity: 0.55; }
+.routine-class.cancelled .routine-course { text-decoration: line-through; }
+
+.routine-progress { margin: 0.6rem 0.25rem 0.2rem; }
+.routine-progress-track {
+  height: 7px; border-radius: var(--radius-pill);
+  background: var(--surface-muted); overflow: hidden;
+}
+.routine-progress-track > i {
+  display: block; height: 100%; border-radius: var(--radius-pill);
+  background: var(--accent);
+  transition: width 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.routine-progress-meta {
+  display: flex; justify-content: space-between;
+  margin-top: 0.4rem; color: var(--text-muted); font-weight: 600;
+}
+.routine-progress-meta b { color: var(--accent); }
+
+.routine-week-title {
+  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--text-muted); font-weight: 700; margin: 0 0.25rem 0.7rem;
+}
+.routine-week { display: grid; gap: 0.7rem; }
+.routine-day { padding: 0; }
+.routine-day.today { border-color: var(--accent); }
+
+.routine-day-head {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  gap: 0.75rem; padding: 0.9rem 1.15rem;
+  background: transparent; border: 0; cursor: pointer;
+  font: inherit; color: inherit; text-align: left;
+}
+.routine-day-name {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-family: var(--font-display); font-weight: 600; text-transform: capitalize;
+}
+.routine-day-meta { display: flex; align-items: center; gap: 0.75rem; }
+.routine-chevron { display: inline-flex; transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.routine-chevron svg { width: 16px; height: 16px; }
+.routine-chevron.open { transform: rotate(180deg); }
+.routine-day-body { padding: 0 1.15rem 0.9rem; }
+
+.routine-source-link { margin-top: 1.25rem; text-align: center; }
+
+.routine-section-title {
+  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--text-muted); font-weight: 700; margin: 1.25rem 0 0.6rem;
+}
+.routine-manage-row {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.55rem 0.7rem; margin-bottom: 0.4rem;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--panel);
+}
+.routine-manage-course { flex: 1; min-width: 0; font-weight: 600; }
+.routine-manage-course.cancelled { text-decoration: line-through; opacity: 0.6; }
+.routine-advanced { margin-top: 0.9rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
+
+/* --- Dialogs --- */
+
+.modal-back {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; align-items: flex-end; justify-content: center;
+  padding: 0;
+  background: rgb(6 20 27 / 45%);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: fade-in 0.2s ease;
+}
+.modal {
+  width: 100%; max-width: 560px; max-height: 88vh; overflow-y: auto;
+  border-radius: var(--radius) var(--radius) 0 0;
+  animation: slide-up 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.05);
+}
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes slide-up { from { transform: translateY(100%); } }
+
+@media (min-width: 620px) {
+  .modal-back { align-items: center; padding: 1.5rem; }
+  .modal { border-radius: var(--radius); }
+}
+
+@media (max-width: 860px) {
+  .routine-time { flex-basis: 4.6rem; font-size: 0.74rem; }
+  .routine-class.now { margin: 0 -0.5rem; padding-left: 0.7rem; padding-right: 0.5rem; }
+  .routine-day-head { padding: 0.85rem 0.95rem; }
+  .routine-day-body { padding: 0 0.95rem 0.85rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .routine-status .dot, .modal, .modal-back { animation: none; }
+  .routine-progress-track > i, .routine-chevron { transition: none; }
+}
+
+/* --- Touch devices --- */
+/* Carried over from the routine tool, which found this the hard way: a
+   backdrop filter re-blurs the moving ground on every scroll frame, and on a
+   phone that is the difference between smooth and not. Touch devices get the
+   solid panel and no sweep. The layout does not move; only the cost does. */
+@media (hover: none) {
+  .card, .sidebar, .topbar, .uni-card, .hero-panel, .public-header, .btn-secondary, .toast {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--panel);
+  }
+  .card::before, .hero-panel::before { display: none; }
+  .routine-status .dot { animation: none; }
+  .blob { filter: blur(90px); }
 }

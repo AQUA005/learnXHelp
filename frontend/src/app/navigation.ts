@@ -35,6 +35,7 @@ const ADMINISTRATION: NavSection = {
     { to: adminTabPath('approvals'), label: 'Account approvals', icon: 'approvals' },
     { to: adminTabPath('people'), label: 'People', icon: 'people' },
     { to: adminTabPath('classes'), label: 'Classes', icon: 'classes' },
+    { to: adminTabPath('routine'), label: 'Routine sheets', icon: 'calendar' },
     { to: adminTabPath('metadata'), label: 'Dropdown options', icon: 'options' },
     { to: adminTabPath('audit'), label: 'Change history', icon: 'history' },
   ],

@@ -5,12 +5,13 @@
  * straight to one without pulling the whole admin bundle into the shell.
  */
 
-export type AdminTab = 'approvals' | 'people' | 'classes' | 'metadata' | 'audit'
+export type AdminTab = 'approvals' | 'people' | 'classes' | 'routine' | 'metadata' | 'audit'
 
 export const ADMIN_TABS: { id: AdminTab; label: string }[] = [
   { id: 'approvals', label: 'Account approvals' },
   { id: 'people', label: 'People' },
   { id: 'classes', label: 'Classes' },
+  { id: 'routine', label: 'Routine sheets' },
   { id: 'metadata', label: 'Dropdown options' },
   { id: 'audit', label: 'Change history' },
 ]
