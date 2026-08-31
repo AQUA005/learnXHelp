@@ -32,6 +32,9 @@ import java.util.Optional;
 @AllArgsConstructor
 public class MasterAdminController {
 
+    /** Appended to every broadcast, so a recipient can see where it came from. */
+    private static final String SIGNATURE = "\n\n---\nSent from LearnX.";
+
     private final UniversityRepository universityRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -97,12 +100,12 @@ public class MasterAdminController {
     public record UniversityResponse(
             Long id, String name, String domain, String slug, String description,
             String contactEmail, String contactPhone, String website, String address,
-            String logoUrl, boolean published, String adminEmail) {
+            String logoUrl, boolean published, String adminEmail, long userCount) {
 
-        static UniversityResponse of(University u, String adminEmail) {
+        static UniversityResponse of(University u, String adminEmail, long userCount) {
             return new UniversityResponse(u.getId(), u.getName(), u.getDomain(), u.getSlug(),
                     u.getDescription(), u.getContactEmail(), u.getContactPhone(), u.getWebsite(),
-                    u.getAddress(), u.getLogoUrl(), u.isPublished(), adminEmail);
+                    u.getAddress(), u.getLogoUrl(), u.isPublished(), adminEmail, userCount);
         }
     }
 
@@ -119,8 +122,15 @@ public class MasterAdminController {
 
     @GetMapping("/universities")
     public ResponseEntity<List<UniversityResponse>> listUniversities() {
+        // Sizes for every tenant in one query. Asking per university turned
+        // this screen into one count per row.
+        Map<Long, Long> sizes = new java.util.HashMap<>();
+        for (Object[] row : userRepository.countGroupedByUniversity()) {
+            sizes.put((Long) row[0], (Long) row[1]);
+        }
         return ResponseEntity.ok(universityRepository.findAll().stream()
-                .map(this::withAdmin).toList());
+                .map(u -> withAdmin(u, sizes.getOrDefault(u.getId(), 0L)))
+                .toList());
     }
 
     @GetMapping("/universities/{id}")
@@ -192,6 +202,56 @@ public class MasterAdminController {
                 brandingService.removeUniversityLogo(requireUniversity(id))));
     }
 
+    /**
+     * One person at one university, as the platform console shows them.
+     *
+     * <p>Read-only, and deliberately thin: the platform owner needs to see who
+     * is on a campus and in what numbers, not to act on them. Approving,
+     * rejecting and reassigning accounts stay with that university's own
+     * administrator, who is the one who knows whether a face belongs there.
+     */
+    public record TenantUser(Long id, String fullName, String email, String role,
+                             boolean approved, String department, String batch, String section) {
+
+        static TenantUser of(User u) {
+            return new TenantUser(u.getId(), u.getFullName(), u.getEmail(),
+                    u.getRole() == null ? null : u.getRole().name(), u.isApproved(),
+                    u.getDepartment(), u.getBatch(), u.getSection());
+        }
+    }
+
+    /** A university's roll, with the totals the console shows above it. */
+    public record TenantUsers(long total, Map<String, Long> byRole, List<TenantUser> users) {
+    }
+
+    @GetMapping("/universities/{id}/users")
+    public ResponseEntity<TenantUsers> listUniversityUsers(@PathVariable Long id) {
+        List<User> people = userRepository.findByUniversity_Id(requireUniversity(id).getId());
+
+        // Every role is present in the map even at zero, so the console can
+        // show "0 teachers" rather than leaving the tab out entirely.
+        Map<String, Long> byRole = new java.util.LinkedHashMap<>();
+        for (Role role : Role.values()) {
+            byRole.put(role.name(), 0L);
+        }
+        for (User person : people) {
+            if (person.getRole() != null) {
+                byRole.merge(person.getRole().name(), 1L, Long::sum);
+            }
+        }
+
+        List<TenantUser> users = people.stream()
+                .sorted(java.util.Comparator
+                        .comparing((User u) -> u.getRole() == null ? Integer.MAX_VALUE : u.getRole().ordinal())
+                        .reversed()
+                        .thenComparing(u -> u.getFullName() == null ? "" : u.getFullName(),
+                                String.CASE_INSENSITIVE_ORDER))
+                .map(TenantUser::of)
+                .toList();
+
+        return ResponseEntity.ok(new TenantUsers(people.size(), byRole, users));
+    }
+
     // --- LearnX's own branding ---
 
     @Data
@@ -237,9 +297,13 @@ public class MasterAdminController {
 
     /** The console lists each university alongside who administers it. */
     private UniversityResponse withAdmin(University university) {
+        return withAdmin(university, userRepository.countByUniversity_Id(university.getId()));
+    }
+
+    private UniversityResponse withAdmin(University university, long userCount) {
         String adminEmail = userRepository.findByUniversityAndRole(university, Role.ADMIN)
                 .stream().findFirst().map(User::getEmail).orElse(null);
-        return UniversityResponse.of(university, adminEmail);
+        return UniversityResponse.of(university, adminEmail, userCount);
     }
 
     private static String required(String value, String message) {
@@ -438,28 +502,52 @@ public class MasterAdminController {
         private String password;
     }
 
+    /**
+     * The platform owner's own account.
+     *
+     * <p>Separate from {@code /api/profile/update}, which routes a changed
+     * email through an administrator for approval — a platform owner has no
+     * administrator above them, so that path would leave the change pending
+     * forever. Everything else is held to the same rules as any other account:
+     * the password policy applies, and the address has to be free.
+     */
     @PostMapping("/profile/update")
     @Transactional
-    public ResponseEntity<?> updateMasterProfile(@RequestBody MasterProfileUpdateRequest request, java.security.Principal principal) {
-        if (principal == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "Not authenticated"));
-        }
-        User sysAdmin = userRepository.findByUsername(principal.getName())
-                .orElseThrow(() -> new com.ustc.learnx.common.NotFoundException("Master account not found"));
+    public ResponseEntity<?> updateMasterProfile(@RequestBody MasterProfileUpdateRequest request) {
+        User sysAdmin = currentUserService.requireCurrentUser();
 
-        if (request.getFullName() != null && !request.getFullName().trim().isEmpty()) {
-            sysAdmin.setFullName(request.getFullName().trim());
+        if (request.getFullName() != null && !request.getFullName().isBlank()) {
+            String fullName = request.getFullName().trim();
+            if (fullName.length() > 255) {
+                throw new ValidationException("Name is too long");
+            }
+            sysAdmin.setFullName(fullName);
         }
-        if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
-            sysAdmin.setEmail(request.getEmail().trim());
+
+        if (request.getEmail() != null && !request.getEmail().isBlank()) {
+            String email = request.getEmail().trim().toLowerCase(java.util.Locale.ROOT);
+            // Email is the sign-in credential and is globally unique, so taking
+            // one that belongs to somebody else would lock them both out.
+            userRepository.findByEmail(email)
+                    .filter(other -> !other.getId().equals(sysAdmin.getId()))
+                    .ifPresent(other -> {
+                        throw new ValidationException("That address is already in use");
+                    });
+            sysAdmin.setEmail(email);
         }
-        if (request.getPassword() != null && !request.getPassword().trim().isEmpty()) {
-            sysAdmin.setPassword(passwordEncoder.encode(request.getPassword().trim()));
+
+        if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            String password = request.getPassword();
+            String policyError = com.ustc.learnx.common.PasswordPolicy.validate(password);
+            if (policyError != null) {
+                throw new ValidationException(policyError);
+            }
+            sysAdmin.setPassword(passwordEncoder.encode(password));
         }
 
         userRepository.save(sysAdmin);
         return ResponseEntity.ok(Map.of(
-                "message", "Master profile updated successfully!",
+                "message", "Your profile has been updated.",
                 "fullName", sysAdmin.getFullName(),
                 "email", sysAdmin.getEmail()
         ));
@@ -486,87 +574,108 @@ public class MasterAdminController {
         return ResponseEntity.ok(bug);
     }
 
-    @GetMapping("/users/emails")
-    public ResponseEntity<?> listUserEmails() {
-        List<Map<String, Object>> result = userRepository.findAll().stream()
-                .map(u -> {
-                    java.util.Map<String, Object> m = new java.util.HashMap<>();
-                    m.put("id", u.getId());
-                    m.put("fullName", u.getFullName() != null ? u.getFullName() : "");
-                    m.put("email", u.getEmail() != null ? u.getEmail() : "");
-                    m.put("username", u.getUsername());
-                    m.put("role", u.getRole() != null ? u.getRole().toString() : "USER");
-                    m.put("universityName", u.getUniversity() != null ? u.getUniversity().getName() : "LearnX");
-                    return m;
-                })
-                .filter(m -> m.get("email") != null && !((String) m.get("email")).trim().isEmpty())
-                .toList();
-        return ResponseEntity.ok(result);
+    /**
+     * Who a broadcast reaches.
+     *
+     * <p>Both filters are optional: no university means every campus, and no
+     * role means everyone at the ones chosen. There is deliberately no list of
+     * addresses — the endpoint used to accept one, which made the application's
+     * SMTP credentials a way to send arbitrary mail to arbitrary strangers.
+     * Recipients are resolved from the account table, so the only people who
+     * can be emailed are people who have accounts.
+     */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class BroadcastRequest {
+        private String subject;
+        private String content;
+        private Long universityId;
+        private String role;
+    }
+
+    /**
+     * How many accounts an audience holds.
+     *
+     * <p>Shown beside the send button. Sending to everyone on the platform and
+     * sending to one class representative are the same two clicks, and the
+     * only thing that distinguishes them is this number.
+     */
+    @GetMapping("/audience")
+    public ResponseEntity<?> audienceSize(@RequestParam(required = false) Long universityId,
+                                          @RequestParam(required = false) String role) {
+        List<String> recipients = resolveAudience(universityId, role);
+        return ResponseEntity.ok(Map.of("count", recipients.size()));
     }
 
     @PostMapping("/send-email")
-    public ResponseEntity<?> sendBroadcastEmail(@RequestBody Map<String, Object> body) {
-        String subject = (String) body.get("subject");
-        String content = (String) body.get("content");
-        List<String> recipientEmails = (List<String>) body.get("recipientEmails");
+    public ResponseEntity<?> sendBroadcastEmail(@RequestBody BroadcastRequest request) {
+        String subject = required(request.getSubject(), "A subject is required");
+        String content = required(request.getContent(), "A message is required");
 
-        if (subject == null || subject.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Subject is required"));
-        }
-        if (content == null || content.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Content is required"));
-        }
-
-        List<String> finalRecipients;
-        if (recipientEmails == null || recipientEmails.isEmpty()) {
-            finalRecipients = userRepository.findAll().stream()
-                    .map(User::getEmail)
-                    .filter(e -> e != null && !e.trim().isEmpty())
-                    .distinct()
-                    .toList();
-        } else {
-            finalRecipients = recipientEmails.stream()
-                    .filter(e -> e != null && !e.trim().isEmpty())
-                    .distinct()
-                    .toList();
-        }
-
-        if (finalRecipients.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "No recipients found to send email to"));
+        List<String> recipients = resolveAudience(request.getUniversityId(), request.getRole());
+        if (recipients.isEmpty()) {
+            throw new ValidationException("Nobody matches that audience");
         }
 
         int successCount = 0;
         int failCount = 0;
-        List<Map<String, String>> failedRecipients = new java.util.ArrayList<>();
+        String fromEmail = env.getProperty("learnx.mail.from");
 
-        for (String email : finalRecipients) {
+        for (String email : recipients) {
             try {
-                org.springframework.mail.SimpleMailMessage message = new org.springframework.mail.SimpleMailMessage();
-                String fromEmail = env.getProperty("learnx.mail.from");
+                org.springframework.mail.SimpleMailMessage message =
+                        new org.springframework.mail.SimpleMailMessage();
                 if (fromEmail != null && !fromEmail.isEmpty()) {
                     message.setFrom(fromEmail);
                 }
                 message.setTo(email);
                 message.setSubject(subject);
-                message.setText(content + "\n\n---\nSent via LearnX Master Broadcast System.");
+                message.setText(content + SIGNATURE);
                 mailSender.send(message);
                 successCount++;
             } catch (Exception ex) {
-                System.err.println("Failed to send broadcast email to " + email + ": " + ex.getMessage());
+                // One unreachable address must not stop the rest of the send.
+                // The address is not logged: the list is the recipient list.
                 failCount++;
-                Map<String, String> failMap = new java.util.HashMap<>();
-                failMap.put("email", email);
-                failMap.put("error", ex.getMessage());
-                failedRecipients.add(failMap);
             }
         }
 
+        auditService.record("PLATFORM", "BROADCAST",
+                currentUserService.requireCurrentUser().getUsername(),
+                "Emailed " + recipients.size() + " recipients: '" + subject + "'");
+
         return ResponseEntity.ok(Map.of(
                 "message", "Broadcast complete",
-                "totalSent", finalRecipients.size(),
+                "totalSent", recipients.size(),
                 "successCount", successCount,
-                "failCount", failCount,
-                "failedRecipients", failedRecipients
-        ));
+                "failCount", failCount));
+    }
+
+    /**
+     * The addresses an audience resolves to.
+     *
+     * <p>A university id that names nothing is rejected rather than quietly
+     * treated as "everybody", which is the difference between a message to one
+     * campus and a message to the whole platform.
+     */
+    private List<String> resolveAudience(Long universityId, String role) {
+        if (universityId != null) {
+            requireUniversity(universityId);
+        }
+        return userRepository.findAudienceEmails(universityId, parseRole(role))
+                .stream().distinct().toList();
+    }
+
+    /** A blank role means every role; anything unrecognised is an error. */
+    private static Role parseRole(String role) {
+        if (role == null || role.isBlank()) {
+            return null;
+        }
+        try {
+            return Role.valueOf(role.trim().toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            throw new ValidationException("There is no role called '" + role + "'");
+        }
     }
 }

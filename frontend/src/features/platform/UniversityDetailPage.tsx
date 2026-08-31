@@ -4,11 +4,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { useToast } from '@/lib/toast'
-import { Alert, Badge, Card, Field, Loading, PageHeader } from '@/components/ui'
+import type { Role } from '@/lib/types'
+import { Alert, Badge, Card, EmptyState, Field, Loading, PageHeader } from '@/components/ui'
 import { ImageUpload } from './PlatformPage'
-import type { ConsoleUniversity } from './types'
+import type { ConsoleUniversity, TenantUser, TenantUsers } from './types'
 
-/** One university: its profile, its logo, whether it is listed, and removing it. */
+/** One university: who is on it, how it is listed, and how to take it down. */
 export default function UniversityDetailPage() {
   const { id = '' } = useParams<{ id: string }>()
   const queryClient = useQueryClient()
@@ -30,7 +31,7 @@ export default function UniversityDetailPage() {
     mutationFn: (published: boolean) =>
       api.put<ConsoleUniversity>(`/api/master/universities/${id}/publish`, { published }),
     onSuccess: (saved) => {
-      notify(saved.published ? 'Published' : 'Taken off the home page', 'success')
+      notify(saved.published ? 'Listed publicly' : 'Hidden from the home page', 'success')
       invalidate()
     },
     onError: (error) => reportError(error),
@@ -60,22 +61,28 @@ export default function UniversityDetailPage() {
 
       <div className="row" style={{ marginBottom: '1rem' }}>
         <Link className="btn btn-secondary btn-sm" to="/platform">
-          Back to the platform
+          All universities
         </Link>
-        {current.published ? <Badge kind="success">Published</Badge> : <Badge kind="warning">Draft</Badge>}
+        {current.published ? <Badge kind="success">Listed</Badge> : <Badge kind="warning">Hidden</Badge>}
+        <span className="small muted">
+          {current.userCount} {current.userCount === 1 ? 'account' : 'accounts'}
+        </span>
       </div>
+
+      <People id={id} />
 
       <Card title="Listing">
         <p className="small muted">
-          A published university appears on the public home page and is open for sign-ups. It
-          needs at least one department first, or the sign-up form has nothing to offer.
+          A listed university appears on the public home page and is open for sign-ups. Hiding
+          one closes new sign-ups and removes it from the home page — it does not sign anybody
+          out, and everybody already there keeps working as before.
         </p>
         <button
           className={current.published ? 'btn btn-secondary' : 'btn'}
           disabled={setPublished.isPending}
           onClick={() => setPublished.mutate(!current.published)}
         >
-          {current.published ? 'Take off the home page' : 'Publish'}
+          {current.published ? 'Hide from the home page' : 'List publicly'}
         </button>
       </Card>
 
@@ -95,6 +102,147 @@ export default function UniversityDetailPage() {
       <DangerZone university={current} />
     </>
   )
+}
+
+/** The role tabs, in the order a campus is usually read: staff first. */
+const ROLE_TABS: { id: Role | 'ALL'; label: string }[] = [
+  { id: 'ALL', label: 'Everyone' },
+  { id: 'ADMIN', label: 'Administrators' },
+  { id: 'TEACHER', label: 'Teachers' },
+  { id: 'CR', label: 'Class representatives' },
+  { id: 'STUDENT', label: 'Students' },
+]
+
+/**
+ * Who is on this campus.
+ *
+ * Read-only on purpose. The platform owner needs to see that a university is
+ * actually being used, and by whom, but approving and placing accounts belongs
+ * to that university's own administrator — they are the one who knows whether
+ * a name belongs there. There is deliberately no approve, reject or promote
+ * button here.
+ */
+function People({ id }: { id: string }) {
+  const [role, setRole] = useState<Role | 'ALL'>('ALL')
+  const [search, setSearch] = useState('')
+
+  const people = useQuery({
+    queryKey: ['platform', 'university', id, 'users'],
+    queryFn: () => api.get<TenantUsers>(`/api/master/universities/${id}/users`),
+  })
+
+  const data = people.data
+  const term = search.trim().toLowerCase()
+  const shown = (data?.users ?? []).filter((person) => {
+    if (role !== 'ALL' && person.role !== role) return false
+    if (!term) return true
+    return (
+      person.fullName?.toLowerCase().includes(term) ||
+      person.email?.toLowerCase().includes(term) ||
+      person.department?.toLowerCase().includes(term)
+    )
+  })
+
+  const countFor = (tab: Role | 'ALL') =>
+    tab === 'ALL' ? (data?.total ?? 0) : (data?.byRole?.[tab] ?? 0)
+
+  return (
+    <Card
+      title={people.isLoading ? 'People' : `${data?.total ?? 0} people`}
+      actions={
+        <input
+          type="search"
+          value={search}
+          placeholder="Search name or email"
+          aria-label="Search people"
+          onChange={(event) => setSearch(event.target.value)}
+        />
+      }
+    >
+      <div className="row" style={{ marginBottom: '0.9rem' }}>
+        {ROLE_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            className={role === tab.id ? 'btn btn-sm' : 'btn btn-secondary btn-sm'}
+            onClick={() => setRole(tab.id)}
+          >
+            {tab.label}
+            <span className="count-pill">{people.isLoading ? '–' : countFor(tab.id)}</span>
+          </button>
+        ))}
+      </div>
+
+      {people.isLoading ? (
+        <Loading rows={4} />
+      ) : shown.length === 0 ? (
+        <EmptyState
+          icon="people"
+          title={term ? 'Nobody matches that search' : 'Nobody here yet'}
+          hint={
+            term
+              ? 'Try part of a name or an email address.'
+              : 'People appear once they sign up and their administrator approves them.'
+          }
+        />
+      ) : (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Department</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((person) => (
+                <PersonRow key={person.id} person={person} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
+  )
+}
+
+function PersonRow({ person }: { person: TenantUser }) {
+  const where = [person.batch, person.section].filter(Boolean).join(' · ')
+  return (
+    <tr>
+      <td>{person.fullName}</td>
+      <td className="small">{person.email}</td>
+      <td className="small">{roleLabel(person.role)}</td>
+      <td className="small">
+        {person.department ?? <span className="muted">—</span>}
+        {where && <div className="small muted">{where}</div>}
+      </td>
+      <td>
+        {person.approved ? (
+          <Badge kind="success">Approved</Badge>
+        ) : (
+          <Badge kind="warning">Awaiting approval</Badge>
+        )}
+      </td>
+    </tr>
+  )
+}
+
+function roleLabel(role: Role): string {
+  switch (role) {
+    case 'STUDENT':
+      return 'Student'
+    case 'CR':
+      return 'Class representative'
+    case 'TEACHER':
+      return 'Teacher'
+    case 'ADMIN':
+      return 'Administrator'
+    case 'SYSTEM_ADMIN':
+      return 'Platform owner'
+  }
 }
 
 function ProfileForm({
@@ -206,6 +354,7 @@ function ProfileForm({
 }
 
 function ResetAdmin({ id }: { id: string }) {
+  const queryClient = useQueryClient()
   const { notify, reportError } = useToast()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -219,6 +368,8 @@ function ResetAdmin({ id }: { id: string }) {
     onSuccess: (result) => {
       notify(result.message, 'success')
       setPassword('')
+      // An address with no account creates one, which changes the roll.
+      void queryClient.invalidateQueries({ queryKey: ['platform', 'university', id] })
     },
     onError: (error) => reportError(error),
   })
@@ -234,7 +385,8 @@ function ResetAdmin({ id }: { id: string }) {
       >
         <p className="small muted">
           Sets a new password for this university's administrator, for when they have locked
-          themselves out. If no account has that address, one is created.
+          themselves out. If no account has that address, one is created and becomes this
+          university's administrator.
         </p>
         <div className="grid grid-2">
           <Field label="Administrator email" htmlFor="reset-email">
@@ -269,7 +421,8 @@ function ResetAdmin({ id }: { id: string }) {
  * Deleting a university.
  *
  * Behind a type-the-name confirmation because it removes every account, exam,
- * note, routine and result belonging to it, and there is no undo.
+ * note, routine and result belonging to it, and there is no undo. Hiding it is
+ * offered alongside, since that is what is usually wanted.
  */
 function DangerZone({ university }: { university: ConsoleUniversity }) {
   const navigate = useNavigate()
@@ -291,8 +444,10 @@ function DangerZone({ university }: { university: ConsoleUniversity }) {
   return (
     <Card title="Delete this university">
       <Alert kind="error">
-        This permanently removes every account, class, routine, note, exam and result belonging
-        to {university.name}. It cannot be undone.
+        This permanently removes {university.userCount}{' '}
+        {university.userCount === 1 ? 'account' : 'accounts'} and every class, routine, note,
+        exam and result belonging to {university.name}. It cannot be undone. To stop new
+        sign-ups without losing anything, hide it instead.
       </Alert>
 
       <Field label={`Type "${university.name}" to confirm`} htmlFor="delete-confirm">

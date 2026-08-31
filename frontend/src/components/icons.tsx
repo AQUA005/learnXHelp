@@ -23,10 +23,9 @@ export type IconName =
   | 'options'
   | 'history'
   | 'platform'
+  | 'palette'
+  | 'bug'
   | 'user'
-  | 'sun'
-  | 'moon'
-  | 'auto'
   | 'clock'
   | 'sparkle'
   | 'chevron'
@@ -121,6 +120,20 @@ const PATHS: Record<IconName, ReactElement> = {
       <path d="M9.5 20.5v-4.2h5v4.2M9.5 10.5h1.6M13 10.5h1.6M9.5 13.5h1.6M13 13.5h1.6" />
     </>
   ),
+  palette: (
+    <>
+      <path d="M12 3.2a8.8 8.8 0 0 0 0 17.6c1.1 0 1.9-.8 1.9-1.8 0-.5-.2-.9-.5-1.2a1.7 1.7 0 0 1 1.2-2.9h1.5A4.7 4.7 0 0 0 20.8 10c0-3.8-3.9-6.8-8.8-6.8z" />
+      <circle cx="7.8" cy="11.8" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="10.4" cy="7.6" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="15.2" cy="8.2" r="1.1" fill="currentColor" stroke="none" />
+    </>
+  ),
+  bug: (
+    <>
+      <rect x="8" y="8" width="8" height="11" rx="4" />
+      <path d="M9.2 6.4a2.8 2.8 0 0 1 5.6 0M4.5 10.5h3.6M15.9 10.5h3.6M4.5 17h3.6M15.9 17h3.6M5.6 7l2.2 1.6M18.4 7l-2.2 1.6" />
+    </>
+  ),
   user: (
     <>
       <circle cx="12" cy="8.5" r="3.4" />
@@ -139,19 +152,6 @@ const PATHS: Record<IconName, ReactElement> = {
       <path d="M4 4l16 16" />
       <path d="M9.9 5.2A9.6 9.6 0 0 1 12 5c5.9 0 9.5 6 9.5 6a17 17 0 0 1-3.5 4.05M6.3 7.4A17 17 0 0 0 2.5 11s3.6 6 9.5 6a9.7 9.7 0 0 0 3.6-.7" />
       <path d="M9.9 10.1a3.2 3.2 0 0 0 4.3 4.3" />
-    </>
-  ),
-  sun: (
-    <>
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4" />
-    </>
-  ),
-  moon: <path d="M20 14.2A8.2 8.2 0 0 1 9.8 4a8.2 8.2 0 1 0 10.2 10.2z" />,
-  auto: (
-    <>
-      <circle cx="12" cy="12" r="8.5" />
-      <path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor" stroke="none" />
     </>
   ),
   clock: (

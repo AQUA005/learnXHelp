@@ -1,6 +1,8 @@
 import type { IconName } from '@/components/icons'
 import type { Role } from '@/lib/types'
-import { ADMIN_DEFAULT_TAB, VIEW_PARAM, adminTabPath } from '@/features/admin/tabs'
+import { ADMIN_DEFAULT_TAB, adminTabPath } from '@/features/admin/tabs'
+import { PLATFORM_DEFAULT_TAB, platformTabPath } from '@/features/platform/tabs'
+import { VIEW_PARAM } from './views'
 
 /**
  * What each role sees in the sidebar.
@@ -131,14 +133,27 @@ const NAVIGATION: Record<Role, NavSection[]> = {
    * A platform owner belongs to no university, so none of the class-scoped
    * screens appear here at all: their endpoints resolve the caller's
    * university and answer 403. They are not a super-administrator of one
-   * school; they run the service the schools sit on.
+   * school; they run the service the schools sit on — which is why there is no
+   * routine, no announcement and no approvals queue in this list.
+   *
+   * Their four screens are named individually rather than hidden behind a
+   * single "Platform" entry, for the same reason the administration screens
+   * are: a screen that is only reachable by clicking a button on another
+   * screen cannot be linked to, cannot be returned to after a reload, and is
+   * invisible to somebody looking for it.
    */
   SYSTEM_ADMIN: [
     {
+      title: 'Overview',
+      items: [{ to: '/', label: 'Home', icon: 'home' }],
+    },
+    {
       title: 'Platform',
       items: [
-        { to: '/', label: 'Home', icon: 'home' },
-        { to: '/platform', label: 'Platform', icon: 'platform' },
+        { to: platformTabPath('universities'), label: 'Universities', icon: 'platform' },
+        { to: platformTabPath('branding'), label: 'Site branding', icon: 'palette' },
+        { to: platformTabPath('bugs'), label: 'Bug reports', icon: 'bug' },
+        { to: platformTabPath('broadcast'), label: 'Broadcast', icon: 'megaphone' },
       ],
     },
     PROFILE,
@@ -150,11 +165,22 @@ export function navigationFor(role: Role): NavSection[] {
 }
 
 /**
+ * What a tabbed screen shows when the address names no view.
+ *
+ * Needed because an entry pointing at the default view has to light up on the
+ * bare path too — landing on `/platform` is landing on Universities.
+ */
+const DEFAULT_VIEW: Record<string, string> = {
+  '/admin': ADMIN_DEFAULT_TAB,
+  '/platform': PLATFORM_DEFAULT_TAB,
+}
+
+/**
  * Whether an entry is the one being looked at.
  *
- * Paths are compared whole, and an entry that names a view — the admin
- * screens do — also has to match the view the address is on, so only one of
- * them lights up at a time.
+ * Paths are compared whole, and an entry that names a view — the admin and
+ * platform screens do — also has to match the view the address is on, so only
+ * one of them lights up at a time.
  */
 export function isNavItemActive(item: NavItem, pathname: string, search: string): boolean {
   const [path, query] = item.to.split('?')
@@ -162,7 +188,7 @@ export function isNavItemActive(item: NavItem, pathname: string, search: string)
   if (!query) return true
 
   const wanted = new URLSearchParams(query).get(VIEW_PARAM)
-  const current = new URLSearchParams(search).get(VIEW_PARAM) ?? ADMIN_DEFAULT_TAB
+  const current = new URLSearchParams(search).get(VIEW_PARAM) ?? DEFAULT_VIEW[path]
   return wanted === current
 }
 

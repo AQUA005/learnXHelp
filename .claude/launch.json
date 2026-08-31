@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "learnx",
+      "runtimeExecutable": "java",
+      "runtimeArgs": ["-jar", "target/learnx-0.0.1-SNAPSHOT.jar", "--spring.profiles.active=dev"],
+      "port": 8080
+    }
+  ]
+}

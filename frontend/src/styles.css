@@ -9,13 +9,14 @@
    be read closely: tables, forms and the exam room sit on a solid panel, so
    nothing a student is marked on is read through a blur. */
 
-/* Light is the default and dark is one attribute away.
+/* One theme, light, defined here in full.
 
-   `data-theme` is written by a small script in the page head before the first
-   paint and kept in step by the theme control, so `system` is already resolved
-   to one value or the other by the time any of this is read. That is why there
-   is no prefers-color-scheme query here: one selector, and the viewer's own
-   choice can override the machine's. */
+   There is deliberately no dark variant and no prefers-color-scheme query:
+   LearnX is read in daylight, on projectors and on shared lab machines, and a
+   second palette doubled the surface every new screen had to be checked
+   against. `color-scheme` is pinned to light so the browser's own widgets --
+   scrollbars, date pickers, form controls -- match the page even on a machine
+   whose system setting is dark. */
 :root {
   color-scheme: light;
 
@@ -24,8 +25,8 @@
   --ground: #eef1f8;
   --ground-deep: #dbe3f5;
 
-  /* The washes and blobs behind everything, as tokens so the two themes
-     differ in one block rather than in every rule that paints them. */
+  /* The washes and blobs behind everything, named as tokens so the rules
+     that paint them read as shapes rather than as colours. */
   --wash-1: rgb(255 255 255 / 70%);
   --wash-2: rgb(188 210 255 / 45%);
   --blob-1-color: #bcd2ff;
@@ -77,54 +78,6 @@
 
   --font: "Outfit", "Segoe UI", system-ui, -apple-system, sans-serif;
   --font-display: "Space Grotesk", "Outfit", "Segoe UI", system-ui, sans-serif;
-}
-
-/* Aurora after dark: the same light, further away. */
-:root[data-theme="dark"] {
-  color-scheme: dark;
-
-  --ground: #0b1020;
-  --ground-deep: #141c38;
-
-  --wash-1: rgb(38 53 107 / 70%);
-  --wash-2: rgb(58 42 99 / 55%);
-  --blob-1-color: #26356b;
-  --blob-2-color: #3a2a63;
-  --blob-3-color: #1d4b46;
-  --blob-4-color: #4a3a20;
-  --blob-5-color: #232c5c;
-  --blob-opacity: 0.5;
-
-  --glass: rgb(28 35 60 / 58%);
-  --glass-hover: rgb(38 47 78 / 72%);
-  --glass-border: rgb(255 255 255 / 13%);
-  --glass-border-lit: rgb(255 255 255 / 26%);
-  --panel: rgb(21 27 48 / 92%);
-  --panel-muted: rgb(21 27 48 / 65%);
-  --sheen: rgb(255 255 255 / 13%);
-
-  --surface: var(--glass);
-  --surface-muted: rgb(255 255 255 / 9%);
-  --border: rgb(255 255 255 / 12%);
-
-  --text: #e9eefc;
-  --text-strong: #f4f7ff;
-  --text-muted: #9aa4be;
-
-  --accent: #7aa2ff;
-  --accent-contrast: #0b1020;
-  --accent-soft: rgb(122 162 255 / 16%);
-  --accent-glow: rgb(122 162 255 / 35%);
-
-  --success: #4fd39a;
-  --success-soft: rgb(79 211 154 / 16%);
-  --warning: #eab766;
-  --warning-soft: rgb(234 183 102 / 16%);
-  --danger: #ff7b7f;
-  --danger-soft: rgb(255 123 127 / 16%);
-
-  --shadow: 0 14px 40px rgb(0 0 0 / 46%), inset 0 1px 0 rgb(255 255 255 / 7%);
-  --shadow-lifted: 0 20px 50px -12px rgb(0 0 0 / 58%), inset 0 1px 0 rgb(255 255 255 / 12%);
 }
 
 * { box-sizing: border-box; }
@@ -338,40 +291,6 @@ a { color: var(--accent); }
 
 .sidebar-footer { padding: 0.8rem 0.7rem 1rem; display: grid; gap: 0.6rem; }
 
-/* Three states, not two: following the machine is a real answer. */
-.theme-toggle {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 2px;
-  padding: 3px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-muted);
-  border: 1px solid var(--glass-border);
-}
-
-.theme-option {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.3rem;
-  padding: 0.32rem 0.4rem;
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--text-muted);
-  font: inherit;
-  font-size: 0.72rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-.theme-option svg { width: 15px; height: 15px; }
-.theme-option:hover { color: var(--text); }
-.theme-option.active {
-  background: var(--panel);
-  color: var(--text-strong);
-  box-shadow: var(--shadow);
-}
-
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 
 .topbar {
@@ -508,6 +427,30 @@ a { color: var(--accent); }
 .btn-danger { background: var(--danger); color: #ffffff; }
 .btn-sm { padding: 0.34rem 0.8rem; font-size: 0.82rem; }
 .btn-block { width: 100%; }
+
+/* An action that should be findable without competing with the one beside it.
+   Reporting a problem sits above Sign out, and must not read as louder. */
+.btn-quiet {
+  background: transparent;
+  color: var(--text-muted);
+  border-color: transparent;
+  font-size: 0.84rem;
+}
+.btn-quiet:hover:not(:disabled) { background: var(--surface-muted); color: var(--text); }
+.btn-quiet svg { width: 16px; height: 16px; }
+
+/* The count carried by a filter button, so choosing between "Teachers" and
+   "Students" does not mean choosing blind. */
+.count-pill {
+  min-width: 1.35rem;
+  padding: 0 0.35rem;
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.btn:not(.btn-secondary) .count-pill { background: rgb(255 255 255 / 25%); }
 
 .field { margin-bottom: 0.95rem; }
 .field label {
@@ -1479,4 +1422,30 @@ tbody tr:hover td { background: var(--surface-muted); }
 @media (max-width: 860px) {
   .auth-shell-page .public-header { padding: 1.1rem 1.25rem; }
   .auth-shell-page .public-main { padding: 0.5rem 1rem 2.5rem; align-items: flex-start; }
+}
+
+/* A bug report is read, not scanned: the title, who hit it and where, then the
+   description in full. A table would have truncated the one part that matters,
+   which is the sentence describing what happened. */
+.bug-report {
+  padding: 0.9rem 0;
+  border-top: 1px solid var(--border);
+}
+.bug-report:first-child { border-top: 0; padding-top: 0.2rem; }
+
+.bug-report-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 0.75rem; margin-bottom: 0.5rem;
+}
+
+.bug-report-body {
+  margin: 0 0 0.6rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text);
+}
+
+.bug-report-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.75rem; flex-wrap: wrap;
 }
