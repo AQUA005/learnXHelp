@@ -201,18 +201,58 @@ test('an administrator sees the administration screens', async ({ page }) => {
 
 test('the platform owner sees the platform, not a class', async ({ page }) => {
   await signIn(page, 'master@learnx.com')
+  const nav = page.getByLabel('Sections')
 
-  // A platform owner belongs to no university, so the class-scoped screens are
-  // not offered to them at all.
-  await expect(page.getByLabel('Sections').getByRole('link', { name: 'Class routine' }))
-    .toHaveCount(0)
-  await expect(page.getByLabel('Sections').getByRole('link', { name: 'My results' }))
-    .toHaveCount(0)
+  // A platform owner belongs to no university, so neither the class-scoped
+  // screens nor that university's administration are offered to them at all.
+  await expect(nav.getByRole('link', { name: 'Class routine' })).toHaveCount(0)
+  await expect(nav.getByRole('link', { name: 'My results' })).toHaveCount(0)
+  await expect(nav.getByRole('link', { name: 'Account approvals' })).toHaveCount(0)
+  await expect(nav.getByRole('link', { name: 'Global announcements' })).toHaveCount(0)
 
-  await page.getByLabel('Sections').getByRole('link', { name: 'Platform' }).click()
-  await expect(page.getByRole('heading', { level: 1, name: 'Platform' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Universities' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Site branding' })).toBeVisible()
+  // Their screens are named one by one rather than hidden behind a single
+  // "Platform" entry, which could not be linked to or returned to.
+  await expect(nav.getByRole('link', { name: 'Universities' })).toBeVisible()
+  await expect(nav.getByRole('link', { name: 'Site branding' })).toBeVisible()
+  await expect(nav.getByRole('link', { name: 'Broadcast' })).toBeVisible()
+
+  await nav.getByRole('link', { name: 'Bug reports' }).click()
+  await expect(page).toHaveURL(/\/platform\?view=bugs$/)
+  await expect(page.getByRole('heading', { level: 1, name: 'Bug reports' })).toBeVisible()
+
+  // Each addresses /platform and differs only by the view, so exactly one of
+  // them may be marked as the current page.
+  const current = nav.locator('[aria-current="page"]')
+  await expect(current).toHaveCount(1)
+  await expect(current).toHaveText('Bug reports')
+
+  await nav.getByRole('link', { name: 'Universities' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Universities' })).toBeVisible()
+})
+
+test('anybody can report a problem, and it arrives attributed', async ({ page }) => {
+  await signIn(page, 'student@learnx.help')
+
+  // Filed from the sidebar, by a student: the people who hit a broken screen
+  // are mostly students, and they have no other way to reach the platform.
+  await page.getByRole('button', { name: 'Report a problem' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Report a problem' })
+  await dialog.getByLabel('What went wrong?').fill('Smoke test report')
+  await dialog.getByLabel('What were you doing at the time?').fill('Filed by the smoke test.')
+  await dialog.getByRole('button', { name: 'Send report' }).click()
+  await expect(page.getByText('reached the LearnX team')).toBeVisible()
+
+  await signOut(page)
+  await signIn(page, 'master@learnx.com')
+  await page.goto('/platform?view=bugs')
+
+  // Nothing about the reporter was sent by the browser: the name, the role and
+  // the university are all read from the session on the server.
+  const report = page.locator('.bug-report').filter({ hasText: 'Smoke test report' })
+  await expect(report).toBeVisible()
+  await expect(report).toContainText('Test Student')
+  await expect(report).toContainText('Student')
+  await expect(report).toContainText('University of Science and Technology Chittagong')
 })
 
 test('each role gets its own navigation, not a longer one', async ({ page }) => {
