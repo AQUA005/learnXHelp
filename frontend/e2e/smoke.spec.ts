@@ -48,6 +48,29 @@ test('a visitor sees the universities and can reach one of them', async ({ page 
   await expect(page.getByLabel('Email')).toBeVisible()
 })
 
+test('the landing page is two actions and a list of universities', async ({ page }) => {
+  await page.goto('/')
+
+  // One heading, and the two ways in. Nothing else is asked of a visitor.
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Sign In' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Get Started' })).toBeVisible()
+
+  // The ground is animated rather than a fixed gradient: the same element
+  // reports a different filter a moment later.
+  const filterNow = await page.evaluate(
+    () => getComputedStyle(document.querySelector('.backdrop')!).filter,
+  )
+  await page.waitForTimeout(3000)
+  const filterLater = await page.evaluate(
+    () => getComputedStyle(document.querySelector('.backdrop')!).filter,
+  )
+  expect(filterLater).not.toBe(filterNow)
+
+  await page.getByRole('link', { name: 'Get Started' }).click()
+  await expect(page).toHaveURL(/\/signup/)
+})
+
 test('an unlisted university is not found', async ({ page }) => {
   await page.goto('/u/no-such-place')
   await expect(page.getByRole('heading', { name: /isn't listed/ })).toBeVisible()

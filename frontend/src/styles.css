@@ -178,6 +178,24 @@ a { color: var(--accent); }
   background:
     radial-gradient(900px 620px at 10% -8%, var(--wash-1), transparent 62%),
     radial-gradient(1100px 760px at 92% 4%, var(--wash-2), transparent 66%);
+  /* The whole sheet drifts through the palette rather than sitting on one
+     gradient. Rotating the hue of the composited layer costs one filter on one
+     element -- animating five background colours would repaint five. The swing
+     is deliberately narrow: far enough that the light is never the same twice,
+     never so far that Aurora turns into a different theme. */
+  animation: aurora 54s ease-in-out infinite;
+  /* Set by the scroll listener in Backdrop.tsx. The layer is fixed, so without
+     this it would be the one thing on the page that never moves. */
+  --parallax: 0px;
+  transform: translate3d(0, var(--parallax), 0);
+  will-change: filter, transform;
+}
+
+@keyframes aurora {
+  0%, 100% { filter: hue-rotate(-16deg) saturate(0.96); }
+  25% { filter: hue-rotate(6deg) saturate(1.08); }
+  50% { filter: hue-rotate(22deg) saturate(1.16); }
+  75% { filter: hue-rotate(4deg) saturate(1.04); }
 }
 
 .blob {
@@ -185,17 +203,26 @@ a { color: var(--accent); }
   border-radius: 50%;
   filter: blur(130px);
   opacity: var(--blob-opacity);
-  animation: float 26s ease-in-out infinite alternate;
+  /* Two motions at different periods, so the field never repeats a pose: one
+     drifts the blob, the other breathes its weight. */
+  animation:
+    float 26s ease-in-out infinite alternate,
+    breathe 19s ease-in-out infinite;
 }
 .blob-1 { top: -10%; left: -8%; width: 48vw; height: 48vw; background: var(--blob-1-color); }
-.blob-2 { top: 6%; right: -12%; width: 42vw; height: 42vw; background: var(--blob-2-color); animation-delay: -7s; }
-.blob-3 { bottom: -12%; left: 4%; width: 46vw; height: 46vw; background: var(--blob-3-color); animation-delay: -13s; }
-.blob-4 { bottom: 4%; right: 0; width: 32vw; height: 32vw; background: var(--blob-4-color); animation-delay: -19s; }
-.blob-5 { top: 40%; left: 34%; width: 38vw; height: 38vw; background: var(--blob-5-color); animation-delay: -24s; }
+.blob-2 { top: 6%; right: -12%; width: 42vw; height: 42vw; background: var(--blob-2-color); animation-delay: -7s, -3s; }
+.blob-3 { bottom: -12%; left: 4%; width: 46vw; height: 46vw; background: var(--blob-3-color); animation-delay: -13s, -8s; }
+.blob-4 { bottom: 4%; right: 0; width: 32vw; height: 32vw; background: var(--blob-4-color); animation-delay: -19s, -14s; }
+.blob-5 { top: 40%; left: 34%; width: 38vw; height: 38vw; background: var(--blob-5-color); animation-delay: -24s, -11s; }
 
 @keyframes float {
   from { transform: translate3d(0, 0, 0) scale(1); }
   to { transform: translate3d(4%, -6%, 0) scale(1.12); }
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: calc(var(--blob-opacity) * 0.72); }
+  50% { opacity: calc(var(--blob-opacity) * 1.18); }
 }
 
 /* --- Layout --- */
@@ -1013,4 +1040,221 @@ tbody tr:hover td { background: var(--surface-muted); }
   .card::before, .hero-panel::before { display: none; }
   .routine-status .dot { animation: none; }
   .blob { filter: blur(90px); }
+}
+
+/* --- The landing page --- */
+/* Two questions and no prose: which university, and in or new. Everything here
+   is glass over the drifting ground, so the page is mostly light and space. */
+
+.landing-shell .public-header {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom: 0;
+  padding: 1.6rem 2.5rem;
+}
+.landing-shell .public-main {
+  max-width: 1180px;
+  padding: 1rem 2.5rem 4rem;
+  display: flex;
+  align-items: center;
+}
+
+.landing {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: 3.5rem;
+  align-items: center;
+  min-height: min(72vh, 640px);
+}
+
+/* Each piece arrives a beat after the one before it. */
+.landing-hero,
+.landing-panel,
+.landing-uni {
+  animation: rise-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.landing-hero { animation-delay: 60ms; }
+.landing-panel { animation-delay: 180ms; }
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
+}
+
+.landing-title {
+  font-size: clamp(2.6rem, 6vw, 4.4rem);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  font-weight: 600;
+  margin: 0 0 2.5rem;
+  max-width: 12ch;
+  text-wrap: balance;
+}
+
+.landing-actions { display: flex; gap: 1rem; flex-wrap: wrap; }
+
+/* A pane of glass, not a button: large, soft, and lit where the pointer is. */
+.glass-cta {
+  --x: 50%;
+  --y: 50%;
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 12.5rem;
+  padding: 1.35rem 2.4rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  box-shadow: var(--shadow);
+  color: var(--text-strong);
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1),
+              box-shadow 0.35s ease, border-color 0.35s ease, background 0.35s ease;
+}
+.glass-cta > span { position: relative; z-index: 1; }
+
+/* The light the glass catches. Painted from two custom properties the pointer
+   moves, so hovering costs a gradient rather than a render. */
+.glass-cta::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: radial-gradient(
+    16rem circle at var(--x) var(--y),
+    var(--glass-border-lit),
+    transparent 60%
+  );
+  transition: opacity 0.35s ease;
+}
+.glass-cta:hover::before, .glass-cta:focus-visible::before { opacity: 1; }
+.glass-cta:hover, .glass-cta:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--glass-border-lit);
+  box-shadow: var(--shadow-lifted), 0 0 34px -12px var(--accent-glow);
+}
+.glass-cta:active { transform: translateY(0) scale(0.985); }
+
+.glass-cta.primary {
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 72%, #ffffff));
+  border-color: transparent;
+  color: var(--accent-contrast);
+  box-shadow: var(--shadow), 0 12px 30px -12px var(--accent-glow);
+}
+.glass-cta.primary::before {
+  background: radial-gradient(16rem circle at var(--x) var(--y), rgb(255 255 255 / 45%), transparent 60%);
+}
+.glass-cta.primary:hover, .glass-cta.primary:focus-visible {
+  box-shadow: var(--shadow-lifted), 0 18px 44px -14px var(--accent-glow);
+}
+
+/* The university list: a frosted pane that scrolls inside itself, fading out
+   at both ends rather than stopping at a hard edge. */
+.landing-panel {
+  padding: 1.4rem 1.1rem 1.4rem 1.4rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  box-shadow: var(--shadow);
+}
+
+.landing-panel-title {
+  font-family: var(--font);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 0.9rem 0.4rem;
+}
+
+.landing-scroll {
+  display: grid;
+  gap: 0.5rem;
+  max-height: min(58vh, 26rem);
+  min-height: 11rem;
+  overflow-y: auto;
+  /* The padding is sized to match the fade below it, so a short list is never
+     dimmed at its own edges: two universities sit in clear glass, twenty
+     dissolve into it as they scroll. */
+  padding: 1.1rem 0.4rem 1.1rem 0;
+  /* The fade is the scroll affordance; a scrollbar would be the only hard
+     line on the page. */
+  mask-image: linear-gradient(to bottom, transparent, #000 1.1rem, #000 calc(100% - 1.1rem), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 1.1rem, #000 calc(100% - 1.1rem), transparent);
+  scrollbar-width: none;
+}
+.landing-scroll::-webkit-scrollbar { width: 0; }
+
+.landing-uni {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: var(--surface-muted);
+  color: var(--text);
+  text-decoration: none;
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+              background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.landing-uni:hover, .landing-uni:focus-visible {
+  transform: translateX(4px);
+  background: var(--glass-hover);
+  border-color: var(--glass-border);
+  box-shadow: var(--shadow);
+}
+
+.landing-uni-mark {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--glass-border);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.82rem;
+  object-fit: contain;
+}
+
+.landing-uni-name {
+  font-weight: 500;
+  font-size: 0.96rem;
+  line-height: 1.3;
+}
+
+@media (max-width: 900px) {
+  .landing {
+    grid-template-columns: 1fr;
+    gap: 2.25rem;
+    min-height: 0;
+  }
+  .landing-shell .public-header { padding: 1.1rem 1.25rem; }
+  .landing-shell .public-main { padding: 0.5rem 1.25rem 3rem; align-items: flex-start; }
+  .landing-title { margin-bottom: 1.75rem; max-width: 14ch; }
+  .glass-cta { flex: 1 1 10rem; padding: 1rem 1.4rem; }
+  .landing-scroll { max-height: 20rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop, .blob { animation: none; }
+  .landing-hero, .landing-panel, .landing-uni, .glass-cta { animation: none; transition: none; }
+  .landing-uni:hover, .glass-cta:hover { transform: none; }
 }
