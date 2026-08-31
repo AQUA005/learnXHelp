@@ -14,17 +14,22 @@ import { brandMarkUrl, useBranding } from '@/lib/branding'
  */
 export default function PublicShell() {
   const branding = useBranding()
-  const isLanding = useLocation().pathname === '/'
+  const path = useLocation().pathname
+  const isLanding = path === '/'
+  // The account screens carry their own way in and out, so the header's copy of
+  // it only competes with them.
+  const isAuth = path === '/signin' || path === '/signup' || path === '/recover'
+  const bare = isLanding || isAuth
 
   return (
-    <div className={isLanding ? 'public-shell landing-shell' : 'public-shell'}>
+    <div className={['public-shell', isLanding && 'landing-shell', isAuth && 'auth-shell-page'].filter(Boolean).join(' ')}>
       <header className="public-header">
         <Link className="public-brand" to="/">
           <img className="public-brand-logo" src={brandMarkUrl(branding)} alt="" />
           <span>{branding.siteName}</span>
         </Link>
 
-        {!isLanding && (
+        {!bare && (
           <nav className="row">
             <Link className="btn btn-secondary btn-sm" to="/signup">
               Create account
@@ -40,7 +45,7 @@ export default function PublicShell() {
         <Outlet />
       </main>
 
-      {!isLanding && (
+      {!bare && (
         <footer className="public-footer">
           <span className="small muted">
             {branding.siteName}

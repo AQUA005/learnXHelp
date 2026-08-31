@@ -1258,3 +1258,225 @@ tbody tr:hover td { background: var(--surface-muted); }
   .landing-hero, .landing-panel, .landing-uni, .glass-cta { animation: none; transition: none; }
   .landing-uni:hover, .glass-cta:hover { transform: none; }
 }
+
+/* --- Account screens --- */
+/* One card, two panes: colour carrying the single sentence worth saying, and
+   the form beside it. */
+
+.auth-split {
+  width: 100%;
+  max-width: 62rem;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  box-shadow: var(--shadow-lifted);
+  animation: rise-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* The coloured pane. Its own gradient rather than the page's, drifting on a
+   different period, so the card reads as lit from inside. */
+.auth-art {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 2.6rem 2.4rem;
+  color: #ffffff;
+  background: linear-gradient(140deg, #2f5cf0, #6a4df0 42%, #22b6c8);
+  background-size: 220% 220%;
+  animation: auth-art-drift 22s ease-in-out infinite;
+}
+
+@keyframes auth-art-drift {
+  0%, 100% { background-position: 0% 40%; }
+  50% { background-position: 100% 60%; }
+}
+
+/* A soft light moving across the colour. */
+.auth-art-light {
+  position: absolute;
+  inset: -30%;
+  background:
+    radial-gradient(38% 38% at 30% 30%, rgb(255 255 255 / 40%), transparent 70%),
+    radial-gradient(32% 32% at 72% 68%, rgb(255 255 255 / 26%), transparent 70%);
+  filter: blur(28px);
+  animation: auth-art-sheen 17s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes auth-art-sheen {
+  from { transform: translate3d(-6%, -4%, 0) scale(1); }
+  to { transform: translate3d(8%, 6%, 0) scale(1.16); }
+}
+
+.auth-art-body { position: relative; }
+.auth-art-eyebrow {
+  margin: 0 0 0.6rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: rgb(255 255 255 / 78%);
+}
+.auth-art-headline {
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(1.6rem, 2.4vw, 2.1rem);
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  max-width: 14ch;
+  text-wrap: balance;
+}
+.auth-art-foot {
+  position: relative;
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 62%);
+}
+
+.auth-pane {
+  padding: 2.6rem 2.4rem;
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.auth-title {
+  font-size: 1.75rem;
+  letter-spacing: -0.03em;
+  margin: 0 0 0.35rem;
+}
+
+.auth-row { display: flex; justify-content: flex-end; margin: -0.35rem 0 1rem; }
+.auth-quiet-link { font-size: 0.84rem; font-weight: 500; text-decoration: none; }
+.auth-quiet-link:hover { text-decoration: underline; }
+
+.auth-submit { padding: 0.85rem 1.4rem; font-size: 0.98rem; }
+
+.auth-foot { margin: 1.1rem 0 0; text-align: center; color: var(--text-muted); }
+.auth-foot a { font-weight: 600; text-decoration: none; }
+.auth-foot a:hover { text-decoration: underline; }
+
+/* The eye that shows what was typed. */
+.password-field { position: relative; }
+.password-field input { padding-right: 2.9rem; }
+.password-reveal {
+  position: absolute;
+  right: 0.4rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2.1rem;
+  height: 2.1rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.password-reveal:hover { color: var(--text); background: var(--surface-muted); }
+.password-reveal svg { width: 18px; height: 18px; }
+.password-hint { margin: 0.35rem 0 0; }
+
+/* --- One question at a time --- */
+
+.step-head { margin-bottom: 1.4rem; }
+
+.step-progress { display: flex; gap: 0.3rem; margin-bottom: 0.9rem; }
+.step-dot {
+  height: 3px;
+  flex: 1;
+  border-radius: var(--radius-pill);
+  background: var(--border);
+  transition: background 0.4s ease;
+}
+.step-dot.done { background: var(--accent); }
+
+.step-count {
+  margin: 0 0 0.3rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+/* Each question arrives from the side it came from. */
+.step-body { animation: step-in 0.34s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes step-in {
+  from { opacity: 0; transform: translateX(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+.step-actions { display: flex; gap: 0.6rem; margin-top: 1.4rem; }
+.step-actions .auth-submit { flex: 1; }
+
+/* A question answered by choosing, not by typing. */
+.choice-list { display: grid; gap: 0.6rem; }
+
+.choice {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.95rem 1.1rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+.choice:hover { border-color: var(--accent); transform: translateY(-1px); }
+.choice.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.choice-title { display: block; font-family: var(--font-display); font-weight: 600; }
+.choice-hint { display: block; margin-top: 0.15rem; font-size: 0.82rem; color: var(--text-muted); }
+
+@media (max-width: 860px) {
+  .auth-split { grid-template-columns: 1fr; max-width: 30rem; }
+  /* Dropped rather than stacked: on a phone it would only push the fields
+     below the fold, which is the one thing this screen must not do. */
+  .auth-art { display: none; }
+  .auth-pane { padding: 1.8rem 1.4rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-split, .step-body, .auth-art, .auth-art-light { animation: none; }
+  .choice, .step-dot { transition: none; }
+  .choice:hover { transform: none; }
+}
+
+/* The account screens sit on the ground with the header carrying only the
+   mark, like the landing page. */
+.auth-shell-page .public-header {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom: 0;
+  padding: 1.6rem 2.5rem;
+}
+.auth-shell-page .public-main {
+  max-width: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1.5rem 3.5rem;
+}
+
+@media (max-width: 860px) {
+  .auth-shell-page .public-header { padding: 1.1rem 1.25rem; }
+  .auth-shell-page .public-main { padding: 0.5rem 1rem 2.5rem; align-items: flex-start; }
+}
