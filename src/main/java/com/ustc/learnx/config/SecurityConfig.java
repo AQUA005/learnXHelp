@@ -37,9 +37,6 @@ public class SecurityConfig {
     /** Files served from the jar. Each contains a dot, so none is a client route. */
     private static final String[] PUBLIC_ASSETS = {
             "/", "/index.html", "/favicon.ico",
-            // Resolves the stored theme before the first paint, so it is
-            // requested by the shell itself, before anybody has signed in.
-            "/theme-boot.js",
             "/assets/**", "/learnx_logo.png", "/ustc_building.jpg"
     };
 

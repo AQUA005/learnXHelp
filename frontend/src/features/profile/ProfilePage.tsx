@@ -6,8 +6,25 @@ import { useCurrentUser, useSession } from '@/lib/session'
 import { useToast } from '@/lib/toast'
 import { Alert, Card, Field, PageHeader, initialsOf } from '@/components/ui'
 
-/** Your own details. Academic fields need an administrator to approve them. */
+/**
+ * Your own details.
+ *
+ * Which fields exist depends on who is looking. Academic ones need an
+ * administrator to approve them, so a platform owner — who has no
+ * administrator above them, and no department, batch or section to put in
+ * them — gets a different screen entirely rather than a form full of blanks
+ * that could never be submitted.
+ */
 export default function ProfilePage() {
+  const user = useCurrentUser()
+
+  if (user.role === 'SYSTEM_ADMIN') {
+    return <PlatformOwnerProfile />
+  }
+  return <MemberProfile />
+}
+
+function MemberProfile() {
   const user = useCurrentUser()
   const { patchUser, refresh } = useSession()
   const { notify, reportError } = useToast()
@@ -141,6 +158,129 @@ export default function ProfilePage() {
 
           <button className="btn" type="submit" disabled={save.isPending}>
             {save.isPending ? 'Saving…' : 'Save changes'}
+          </button>
+        </form>
+      </Card>
+    </>
+  )
+}
+
+/**
+ * The platform owner's own account.
+ *
+ * Three fields, because three are all that mean anything: a platform owner
+ * belongs to no university, so an ID number, a department, a batch, a semester
+ * and a section describe nothing about them. The password lives here rather
+ * than behind a recovery email, since there is nobody above this account to
+ * reset it.
+ */
+function PlatformOwnerProfile() {
+  const user = useCurrentUser()
+  const { refresh } = useSession()
+  const { notify, reportError } = useToast()
+
+  const [fullName, setFullName] = useState(user.fullName)
+  const [email, setEmail] = useState(user.email)
+  const [password, setPassword] = useState('')
+  const [repeat, setRepeat] = useState('')
+
+  const mismatch = password !== '' && repeat !== password
+
+  const save = useMutation({
+    mutationFn: () =>
+      api.post<{ message: string }>('/api/master/profile/update', {
+        fullName,
+        email,
+        // Left out entirely when blank, so saving a name never touches it.
+        password: password || null,
+      }),
+    onSuccess: async (result) => {
+      notify(result.message, 'success')
+      setPassword('')
+      setRepeat('')
+      await refresh()
+    },
+    onError: (error) => reportError(error),
+  })
+
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    if (mismatch) return
+    save.mutate()
+  }
+
+  return (
+    <>
+      <PageHeader title="Profile" description="The account that owns this platform." />
+
+      <Card title="Your details">
+        <form onSubmit={submit} noValidate>
+          <div className="grid grid-2">
+            <Field label="Full name" htmlFor="owner-name">
+              <input
+                id="owner-name"
+                value={fullName}
+                required
+                onChange={(event) => setFullName(event.target.value)}
+              />
+            </Field>
+            <Field label="Email" htmlFor="owner-email">
+              <input
+                id="owner-email"
+                type="email"
+                value={email}
+                required
+                autoComplete="username"
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            </Field>
+          </div>
+          <p className="small muted">
+            This address is how you sign in. Changing it takes effect immediately — there is no
+            administrator above this account to approve it.
+          </p>
+
+          <button className="btn" type="submit" disabled={save.isPending || mismatch}>
+            {save.isPending ? 'Saving…' : 'Save changes'}
+          </button>
+        </form>
+      </Card>
+
+      <Card title="Password">
+        <form onSubmit={submit} noValidate>
+          <Alert kind="info">
+            This account can create, hide and delete every university on LearnX. Give it a
+            password you use nowhere else.
+          </Alert>
+
+          <div className="grid grid-2">
+            <Field label="New password" htmlFor="owner-password">
+              <input
+                id="owner-password"
+                type="password"
+                value={password}
+                autoComplete="new-password"
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </Field>
+            <Field label="Repeat it" htmlFor="owner-password-repeat">
+              <input
+                id="owner-password-repeat"
+                type="password"
+                value={repeat}
+                autoComplete="new-password"
+                onChange={(event) => setRepeat(event.target.value)}
+              />
+            </Field>
+          </div>
+          {mismatch && <div className="field-error">Those two do not match.</div>}
+
+          <button
+            className="btn"
+            type="submit"
+            disabled={save.isPending || !password || mismatch}
+          >
+            {save.isPending ? 'Saving…' : 'Change password'}
           </button>
         </form>
       </Card>

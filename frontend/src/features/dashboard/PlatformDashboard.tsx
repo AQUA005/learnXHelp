@@ -5,10 +5,9 @@ import { useCurrentUser } from '@/lib/session'
 import { useBranding } from '@/lib/branding'
 import { Badge, Card, EmptyState, Loading, PageHeader } from '@/components/ui'
 import StatTile from './StatTile'
-import type { ConsoleUniversity } from '@/features/platform/types'
+import type { BugReport, ConsoleUniversity } from '@/features/platform/types'
+import { platformTabPath } from '@/features/platform/tabs'
 import { firstName, partOfDay } from './queries'
-
-type BugReport = { id: number; title: string; status: string; reportedBy: string }
 
 /**
  * The platform owner's home screen.
@@ -34,6 +33,7 @@ export default function PlatformDashboard() {
   const published = all.filter((university) => university.published)
   const drafts = all.filter((university) => !university.published)
   const openBugs = (bugs.data ?? []).filter((bug) => bug.status !== 'RESOLVED')
+  const people = all.reduce((total, university) => total + university.userCount, 0)
 
   return (
     <>
@@ -46,18 +46,28 @@ export default function PlatformDashboard() {
         <StatTile
           icon="platform"
           value={universities.isLoading ? '—' : published.length}
-          label="Published universities"
-          hint={published.length === 0 ? 'None are listed publicly yet' : 'Listed on the homepage'}
+          label="Listed universities"
+          hint={published.length === 0 ? 'None are public yet' : 'Open for sign-ups'}
         />
         <StatTile
           icon="classes"
           value={universities.isLoading ? '—' : drafts.length}
-          label="Awaiting publication"
-          hint={drafts.length === 0 ? 'No drafts' : 'Set up but not yet listed'}
+          label="Hidden universities"
+          hint={drafts.length === 0 ? 'None waiting' : 'Set up but not yet listed'}
           tone={drafts.length > 0 ? 'warning' : undefined}
         />
         <StatTile
-          icon="sparkle"
+          icon="people"
+          value={universities.isLoading ? '—' : people}
+          label="Accounts on LearnX"
+          hint={
+            all.length === 0
+              ? 'Nobody yet'
+              : `Across ${all.length} universit${all.length === 1 ? 'y' : 'ies'}`
+          }
+        />
+        <StatTile
+          icon="bug"
           value={bugs.isLoading ? '—' : openBugs.length}
           label="Open bug reports"
           hint={openBugs.length === 0 ? 'Nothing outstanding' : 'Reported and not yet resolved'}
@@ -69,7 +79,7 @@ export default function PlatformDashboard() {
         <Card
           title="Universities"
           actions={
-            <Link className="btn btn-secondary btn-sm" to="/platform">
+            <Link className="btn btn-secondary btn-sm" to={platformTabPath('universities')}>
               Manage
             </Link>
           }
@@ -84,9 +94,9 @@ export default function PlatformDashboard() {
                 <div className="timeline-item" key={university.id}>
                   <div className="timeline-time">
                     {university.published ? (
-                      <Badge kind="success">Live</Badge>
+                      <Badge kind="success">Listed</Badge>
                     ) : (
-                      <Badge kind="warning">Draft</Badge>
+                      <Badge kind="warning">Hidden</Badge>
                     )}
                   </div>
                   <div>
@@ -104,7 +114,7 @@ export default function PlatformDashboard() {
         <Card
           title="Open bug reports"
           actions={
-            <Link className="btn btn-secondary btn-sm" to="/platform">
+            <Link className="btn btn-secondary btn-sm" to={platformTabPath('bugs')}>
               Triage
             </Link>
           }
@@ -113,7 +123,7 @@ export default function PlatformDashboard() {
             <Loading />
           ) : openBugs.length === 0 ? (
             <EmptyState
-              icon="sparkle"
+              icon="bug"
               title="Nothing outstanding"
               hint="Reports from any university land here."
             />
@@ -123,7 +133,9 @@ export default function PlatformDashboard() {
                 <div className="timeline-item" key={bug.id}>
                   <div>
                     <div className="slot-course">{bug.title}</div>
-                    <div className="small muted">{bug.reportedBy}</div>
+                    <div className="small muted">
+                      {bug.reportedBy ?? 'Unknown'} · {bug.universityName ?? 'LearnX'}
+                    </div>
                   </div>
                 </div>
               ))}

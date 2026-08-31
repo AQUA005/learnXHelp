@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="light dark" />
+    <meta name="color-scheme" content="light" />
     <!--
       The platform owner's small logo, falling back to the one bundled in the
       jar when none has been uploaded. There was no icon link at all before, so
@@ -23,13 +23,6 @@
       href="https://fonts.googleapis.com/css2?family=Outfit:wght@300..800&family=Space+Grotesk:wght@400..700&display=swap"
     />
     <title>LearnX</title>
-    <!--
-      The theme is resolved before the first paint, not after React mounts, so
-      somebody who has chosen dark never sees a white page while the bundle
-      arrives. Blocking and same-origin on purpose: the Content-Security-Policy
-      is script-src 'self', which an inline snippet would force us to weaken.
-    -->
-    <script src="/theme-boot.js"></script>
   </head>
   <body>
     <div id="root"></div>

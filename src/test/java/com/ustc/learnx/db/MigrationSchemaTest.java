@@ -50,7 +50,7 @@ class MigrationSchemaTest {
                 String.class);
         // Update this list when adding a migration, so a script that fails to
         // apply cannot pass unnoticed.
-        assertThat(versions).containsExactly("1", "2", "3", "4", "5");
+        assertThat(versions).containsExactly("1", "2", "3", "4", "5", "6");
     }
 
     /** Tables the application cannot function without. */

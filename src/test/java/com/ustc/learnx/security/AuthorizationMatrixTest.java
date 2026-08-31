@@ -116,7 +116,7 @@ class AuthorizationMatrixTest {
             "GET,    /api/master/universities",
             "POST,   /api/master/universities/1/reset-admin",
             "DELETE, /api/master/universities/1",
-            "GET,    /api/master/users/emails",
+            "GET,    /api/master/audience",
             "POST,   /api/master/send-email",
             "GET,    /api/dashboard/all-grades",
             "POST,   /api/dashboard/grades",
@@ -216,7 +216,7 @@ class AuthorizationMatrixTest {
             "GET,    /api/admin/pending",
             "POST,   /api/admin/approve/1",
             "DELETE, /api/admin/reject/1",
-            "GET,    /api/master/users/emails",
+            "GET,    /api/master/audience",
             "POST,   /api/master/send-email",
             "GET,    /api/dashboard/all-grades",
             "POST,   /api/dashboard/grades",
@@ -255,7 +255,7 @@ class AuthorizationMatrixTest {
     @CsvSource({
             "GET, /api/admin/pending",
             "GET, /api/dashboard/all-grades",
-            "GET, /api/master/users/emails",
+            "GET, /api/master/audience",
             "GET, /api/schedule/audit-logs"
     })
     void classRepresentativeIsDeniedStaffEndpoints(String method, String path) throws Exception {
@@ -271,7 +271,7 @@ class AuthorizationMatrixTest {
             "GET, /api/admin/classes/1",
             "GET, /api/admin/users",
             "POST, /api/admin/users/1/reset-password",
-            "GET, /api/master/users/emails",
+            "GET, /api/master/audience",
             "GET, /api/schedule/audit-logs"
     })
     void teacherIsDeniedAdminEndpoints(String method, String path) throws Exception {
@@ -283,7 +283,8 @@ class AuthorizationMatrixTest {
     @ParameterizedTest(name = "admin is denied {0} {1}")
     @CsvSource({
             "GET,    /api/master/universities",
-            "GET,    /api/master/users/emails",
+            "GET,    /api/master/universities/1/users",
+            "GET,    /api/master/audience",
             "POST,   /api/master/send-email",
             "DELETE, /api/master/universities/1"
     })
@@ -300,7 +301,7 @@ class AuthorizationMatrixTest {
     @CsvSource({
             "GET, /api/master/universities",
             "GET, /api/master/bugs",
-            "GET, /api/master/users/emails"
+            "GET, /api/master/audience"
     })
     void masterReachesPlatformEndpoints(String method, String path) throws Exception {
         mvc.perform(request(method, path).with(user("master").roles("SYSTEM_ADMIN")).with(csrf()))

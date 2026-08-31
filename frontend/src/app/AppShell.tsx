@@ -1,17 +1,20 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useSession } from '@/lib/session'
 import { brandMarkUrl, useBranding } from '@/lib/branding'
 import type { Role } from '@/lib/types'
 import { Icon } from '@/components/icons'
 import { initialsOf } from '@/components/ui'
-import ThemeToggle from '@/components/ThemeToggle'
 import { activeLabel, isNavItemActive, navigationFor } from './navigation'
+
+// Loaded only when somebody actually has something to report.
+const ReportProblem = lazy(() => import('@/features/support/ReportProblem'))
 
 export default function AppShell() {
   const { user, signOut } = useSession()
   const branding = useBranding()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [reporting, setReporting] = useState(false)
   const location = useLocation()
 
   if (!user) return null
@@ -81,7 +84,18 @@ export default function AppShell() {
         </nav>
 
         <div className="sidebar-footer">
-          <ThemeToggle />
+          {/* Every role, on every screen: whoever runs into a broken page is
+              the one who can describe it, and that is usually a student. */}
+          <button
+            className="btn btn-quiet btn-block"
+            onClick={() => {
+              setReporting(true)
+              setMenuOpen(false)
+            }}
+          >
+            <Icon name="bug" />
+            <span>Report a problem</span>
+          </button>
           <button className="btn btn-secondary btn-block" onClick={() => void signOut()}>
             Sign out
           </button>
@@ -104,6 +118,12 @@ export default function AppShell() {
           <Outlet />
         </main>
       </div>
+
+      {reporting && (
+        <Suspense fallback={null}>
+          <ReportProblem onClose={() => setReporting(false)} />
+        </Suspense>
+      )}
     </div>
   )
 }
