@@ -3,7 +3,10 @@ import type { FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ApiError } from '@/lib/api'
 import { useSession } from '@/lib/session'
-import { Alert, Card, Field } from '@/components/ui'
+import { useBranding } from '@/lib/branding'
+import { Alert, Field } from '@/components/ui'
+import AuthLayout from './AuthLayout'
+import PasswordField from './PasswordField'
 
 /**
  * Signing in with an email address.
@@ -14,6 +17,7 @@ import { Alert, Card, Field } from '@/components/ui'
  */
 export default function SignInPage() {
   const { signIn } = useSession()
+  const branding = useBranding()
   const navigate = useNavigate()
   const [params] = useSearchParams()
 
@@ -37,47 +41,49 @@ export default function SignInPage() {
   }
 
   return (
-    <div className="auth-card">
-      <Card title="Sign in">
-        <form onSubmit={submit} noValidate>
-          {error && <Alert kind="error">{error}</Alert>}
+    <AuthLayout
+      eyebrow="Welcome back"
+      headline={branding.tagline ?? 'Your campus, in one place'}
+    >
+      <h1 className="auth-title">Log in</h1>
 
-          <Field label="Email" htmlFor="signin-email">
-            <input
-              id="signin-email"
-              type="email"
-              value={email}
-              autoComplete="email"
-              required
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </Field>
+      <form onSubmit={submit} noValidate>
+        {error && <Alert kind="error">{error}</Alert>}
 
-          <Field label="Password" htmlFor="signin-password">
-            <input
-              id="signin-password"
-              type="password"
-              value={password}
-              autoComplete="current-password"
-              required
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </Field>
+        <Field label="Email" htmlFor="signin-email">
+          <input
+            id="signin-email"
+            type="email"
+            value={email}
+            autoComplete="email"
+            placeholder="you@university.edu"
+            required
+            onChange={(event) => setEmail(event.target.value)}
+          />
+        </Field>
 
-          <button className="btn btn-block" type="submit" disabled={busy}>
-            {busy ? 'Signing in…' : 'Sign in'}
-          </button>
+        <PasswordField
+          id="signin-password"
+          label="Password"
+          value={password}
+          autoComplete="current-password"
+          onChange={setPassword}
+        />
 
-          <div className="row row-end" style={{ marginTop: '0.7rem' }}>
-            <Link className="btn btn-secondary btn-sm" to="/recover">
-              Forgotten your password?
-            </Link>
-            <Link className="btn btn-secondary btn-sm" to="/signup">
-              Create account
-            </Link>
-          </div>
-        </form>
-      </Card>
-    </div>
+        <div className="auth-row">
+          <Link className="auth-quiet-link" to="/recover">
+            Forgotten your password?
+          </Link>
+        </div>
+
+        <button className="btn btn-block auth-submit" type="submit" disabled={busy}>
+          {busy ? 'Signing in…' : 'Log in'}
+        </button>
+
+        <p className="auth-foot small">
+          New here? <Link to="/signup">Create an account</Link>
+        </p>
+      </form>
+    </AuthLayout>
   )
 }

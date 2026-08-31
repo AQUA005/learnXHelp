@@ -3,7 +3,9 @@ import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ApiError, api } from '@/lib/api'
 import { useToast } from '@/lib/toast'
-import { Alert, Card, Field } from '@/components/ui'
+import { Alert, Field } from '@/components/ui'
+import AuthLayout from './AuthLayout'
+import PasswordField from './PasswordField'
 
 /** Resetting a forgotten password: request a code by email, then use it. */
 export default function RecoverPage() {
@@ -52,8 +54,14 @@ export default function RecoverPage() {
   }
 
   return (
-    <div className="auth-card">
-      <Card title="Reset your password">
+    <AuthLayout eyebrow="Account recovery" headline="Back in, in two steps">
+      <h1 className="auth-title">Reset your password</h1>
+      <p className="small muted">
+        {step === 'request'
+          ? 'We will email you a code.'
+          : 'Enter the code we emailed you, and choose a new password.'}
+      </p>
+      <div>
         <form onSubmit={step === 'request' ? requestCode : resetPassword} noValidate>
           {error && <Alert kind="error">{error}</Alert>}
 
@@ -80,30 +88,26 @@ export default function RecoverPage() {
                   onChange={(e) => setCode(e.target.value)}
                 />
               </Field>
-              <Field label="New password" htmlFor="recover-password">
-                <input
-                  id="recover-password"
-                  type="password"
-                  value={password}
-                  autoComplete="new-password"
-                  required
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </Field>
+              <PasswordField
+                id="recover-password"
+                label="New password"
+                value={password}
+                autoComplete="new-password"
+                hint="At least eight characters, including a letter and a number."
+                onChange={setPassword}
+              />
             </>
           )}
 
-          <button className="btn btn-block" type="submit" disabled={busy}>
+          <button className="btn btn-block auth-submit" type="submit" disabled={busy}>
             {step === 'request' ? 'Send code' : 'Reset password'}
           </button>
 
-          <div className="row row-end" style={{ marginTop: '0.7rem' }}>
-            <Link className="btn btn-secondary btn-sm" to="/signin">
-              Back to sign in
-            </Link>
-          </div>
+          <p className="auth-foot small">
+            Remembered it? <Link to="/signin">Log in</Link>
+          </p>
         </form>
-      </Card>
-    </div>
+      </div>
+    </AuthLayout>
   )
 }

@@ -30,6 +30,8 @@ export type IconName =
   | 'clock'
   | 'sparkle'
   | 'chevron'
+  | 'eye'
+  | 'eye-off'
 
 const PATHS: Record<IconName, ReactElement> = {
   home: (
@@ -126,6 +128,19 @@ const PATHS: Record<IconName, ReactElement> = {
     </>
   ),
   chevron: <path d="M6 9.5l6 6 6-6" />,
+  eye: (
+    <>
+      <path d="M2.5 12s3.6-6 9.5-6 9.5 6 9.5 6-3.6 6-9.5 6-9.5-6-9.5-6z" />
+      <circle cx="12" cy="12" r="3.2" />
+    </>
+  ),
+  'eye-off': (
+    <>
+      <path d="M4 4l16 16" />
+      <path d="M9.9 5.2A9.6 9.6 0 0 1 12 5c5.9 0 9.5 6 9.5 6a17 17 0 0 1-3.5 4.05M6.3 7.4A17 17 0 0 0 2.5 11s3.6 6 9.5 6a9.7 9.7 0 0 0 3.6-.7" />
+      <path d="M9.9 10.1a3.2 3.2 0 0 0 4.3 4.3" />
+    </>
+  ),
   sun: (
     <>
       <circle cx="12" cy="12" r="4" />

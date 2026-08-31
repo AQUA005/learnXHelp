@@ -18,9 +18,10 @@ import { expect, test } from '@playwright/test'
 async function signIn(page: import('@playwright/test').Page, email: string) {
   await page.goto('/signin')
   await page.getByLabel('Email').fill(email)
-  await page.getByLabel('Password').fill('password')
-  // Scoped to the form: the header link to this page carries the same name.
-  await page.locator('form').getByRole('button', { name: 'Sign in' }).click()
+  // Exact: the button that reveals what was typed is labelled "Show password",
+  // which a substring match would also find.
+  await page.getByLabel('Password', { exact: true }).fill('password')
+  await page.getByRole('button', { name: 'Log in' }).click()
   await expect(page.getByRole('link', { name: 'Home' })).toBeVisible()
 }
 
@@ -42,10 +43,62 @@ test('a visitor sees the universities and can reach one of them', async ({ page 
   await expect(page.getByRole('heading', { level: 1, name: /University of Science and Technology/ }))
     .toBeVisible()
 
-  // And from there into a signup scoped to that university.
+  // And from there into a signup scoped to that university, which opens on the
+  // first question rather than on a form.
   await page.getByRole('link', { name: 'Create an account' }).click()
   await expect(page).toHaveURL(/university=ustc-ac-bd/)
-  await expect(page.getByLabel('Email')).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /joining as/i })).toBeVisible()
+})
+
+test('signing up is one question at a time', async ({ page }) => {
+  await page.goto('/signup?university=ustc-ac-bd')
+
+  // Who you are. The university was answered by the link that got us here, so
+  // it is neither asked again nor counted, and the email box is nowhere in
+  // sight yet.
+  await expect(page.getByText('Step 1 of 5')).toBeVisible()
+  await expect(page.getByLabel('Email')).toHaveCount(0)
+
+  await page.getByRole('button', { name: /^Student/ }).click()
+  await page.getByRole('button', { name: 'Continue' }).click()
+
+  // Your name and email, and no more than that.
+  await expect(page.getByRole('heading', { level: 1, name: /call you/i })).toBeVisible()
+  await expect(page.getByLabel('Department')).toHaveCount(0)
+
+  // A step cannot be left half answered.
+  await expect(page.getByRole('button', { name: 'Continue' })).toBeDisabled()
+  await page.getByLabel('Full name').fill('Ada Lovelace')
+  await page.getByLabel('Email').fill('ada@learnx.help')
+  await expect(page.getByRole('button', { name: 'Continue' })).toBeEnabled()
+
+  // And going back does not lose what was typed.
+  await page.getByRole('button', { name: 'Back' }).click()
+  await page.getByRole('button', { name: 'Continue' }).click()
+  await expect(page.getByLabel('Full name')).toHaveValue('Ada Lovelace')
+})
+
+test('the landing page is two actions and a list of universities', async ({ page }) => {
+  await page.goto('/')
+
+  // One heading, and the two ways in. Nothing else is asked of a visitor.
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Sign In' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Get Started' })).toBeVisible()
+
+  // The ground is animated rather than a fixed gradient: the same element
+  // reports a different filter a moment later.
+  const filterNow = await page.evaluate(
+    () => getComputedStyle(document.querySelector('.backdrop')!).filter,
+  )
+  await page.waitForTimeout(3000)
+  const filterLater = await page.evaluate(
+    () => getComputedStyle(document.querySelector('.backdrop')!).filter,
+  )
+  expect(filterLater).not.toBe(filterNow)
+
+  await page.getByRole('link', { name: 'Get Started' }).click()
+  await expect(page).toHaveURL(/\/signup/)
 })
 
 test('an unlisted university is not found', async ({ page }) => {
