@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { Icon } from './icons'
+import type { IconName } from './icons'
 
 /**
  * Small building blocks shared across features.
@@ -38,9 +40,23 @@ export function Alert({ kind, children }: { kind: 'error' | 'success' | 'info'; 
   )
 }
 
-export function EmptyState({ title, hint }: { title: string; hint?: string }) {
+/** Nothing to show, said in a way that reads as an answer rather than a gap. */
+export function EmptyState({
+  title,
+  hint,
+  icon,
+}: {
+  title: string
+  hint?: string
+  icon?: IconName
+}) {
   return (
     <div className="empty">
+      {icon && (
+        <div className="empty-mark" aria-hidden="true">
+          <Icon name={icon} />
+        </div>
+      )}
       <h3>{title}</h3>
       {hint && <p className="small">{hint}</p>}
     </div>

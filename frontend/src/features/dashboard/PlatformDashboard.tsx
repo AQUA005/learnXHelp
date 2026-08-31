@@ -4,6 +4,7 @@ import { api } from '@/lib/api'
 import { useCurrentUser } from '@/lib/session'
 import { useBranding } from '@/lib/branding'
 import { Badge, Card, EmptyState, Loading, PageHeader } from '@/components/ui'
+import StatTile from './StatTile'
 import type { ConsoleUniversity } from '@/features/platform/types'
 import { firstName, partOfDay } from './queries'
 
@@ -42,26 +43,26 @@ export default function PlatformDashboard() {
       />
 
       <div className="grid grid-3" style={{ marginBottom: '1rem' }}>
-        <Card>
-          <div className="stat">
-            <span className="stat-value mono">
-              {universities.isLoading ? '—' : published.length}
-            </span>
-            <span className="stat-label">Published universities</span>
-          </div>
-        </Card>
-        <Card>
-          <div className="stat">
-            <span className="stat-value mono">{universities.isLoading ? '—' : drafts.length}</span>
-            <span className="stat-label">Awaiting publication</span>
-          </div>
-        </Card>
-        <Card>
-          <div className="stat">
-            <span className="stat-value mono">{bugs.isLoading ? '—' : openBugs.length}</span>
-            <span className="stat-label">Open bug reports</span>
-          </div>
-        </Card>
+        <StatTile
+          icon="platform"
+          value={universities.isLoading ? '—' : published.length}
+          label="Published universities"
+          hint={published.length === 0 ? 'None are listed publicly yet' : 'Listed on the homepage'}
+        />
+        <StatTile
+          icon="classes"
+          value={universities.isLoading ? '—' : drafts.length}
+          label="Awaiting publication"
+          hint={drafts.length === 0 ? 'No drafts' : 'Set up but not yet listed'}
+          tone={drafts.length > 0 ? 'warning' : undefined}
+        />
+        <StatTile
+          icon="sparkle"
+          value={bugs.isLoading ? '—' : openBugs.length}
+          label="Open bug reports"
+          hint={openBugs.length === 0 ? 'Nothing outstanding' : 'Reported and not yet resolved'}
+          tone={openBugs.length > 0 ? 'warning' : undefined}
+        />
       </div>
 
       <div className="grid grid-2">
@@ -76,7 +77,7 @@ export default function PlatformDashboard() {
           {universities.isLoading ? (
             <Loading />
           ) : all.length === 0 ? (
-            <EmptyState title="No universities yet" hint="Add the first from the platform screen." />
+            <EmptyState icon="platform" title="No universities yet" hint="Add the first from the platform screen." />
           ) : (
             <div>
               {all.slice(0, 6).map((university) => (
@@ -111,7 +112,11 @@ export default function PlatformDashboard() {
           {bugs.isLoading ? (
             <Loading />
           ) : openBugs.length === 0 ? (
-            <EmptyState title="Nothing outstanding" />
+            <EmptyState
+              icon="sparkle"
+              title="Nothing outstanding"
+              hint="Reports from any university land here."
+            />
           ) : (
             <div>
               {openBugs.slice(0, 6).map((bug) => (

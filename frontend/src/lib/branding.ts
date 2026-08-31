@@ -26,3 +26,14 @@ export function useBranding(): PlatformBranding {
   })
   return query.data ?? FALLBACK
 }
+
+/**
+ * The mark to show beside the site name.
+ *
+ * Falls back to the platform icon endpoint, which answers with the logo
+ * bundled in the jar when nobody has uploaded one, so the shell always has a
+ * mark rather than a bare word.
+ */
+export function brandMarkUrl(branding: PlatformBranding): string {
+  return branding.logoUrl ?? branding.iconUrl ?? '/api/public/branding/icon'
+}

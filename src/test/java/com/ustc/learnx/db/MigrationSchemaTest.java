@@ -50,7 +50,7 @@ class MigrationSchemaTest {
                 String.class);
         // Update this list when adding a migration, so a script that fails to
         // apply cannot pass unnoticed.
-        assertThat(versions).containsExactly("1", "2", "3", "4");
+        assertThat(versions).containsExactly("1", "2", "3", "4", "5");
     }
 
     /** Tables the application cannot function without. */
@@ -61,7 +61,7 @@ class MigrationSchemaTest {
             "class_tests", "exams", "exam_questions", "exam_submissions",
             "gradebooks", "resources", "resource_reactions", "announcements",
             "audit_logs", "bug_reports", "profile_change_requests", "promotion_history",
-            "platform_settings"
+            "platform_settings", "routine_sources", "routine_overrides"
     })
     void tableExists(String table) {
         Integer count = jdbc.queryForObject(

@@ -7,8 +7,16 @@ import { useToast } from '@/lib/toast'
 import { DAY_ORDER, formatDateTime, formatTime, titleCase } from '@/lib/format'
 import type { ClassTest, RoutineItem } from '@/lib/types'
 import { Badge, Card, EmptyState, Field, Loading, PageHeader } from '@/components/ui'
+import LiveRoutine from './LiveRoutine'
 
-/** The weekly routine, and the class tests scheduled against it. */
+/**
+ * The routine, and the class tests scheduled against it.
+ *
+ * The routine itself is the sheet the university publishes, read through
+ * {@link LiveRoutine}. What a class keeps in LearnX -- the odd class the sheet
+ * does not carry -- is merged into it rather than shown separately, and is
+ * still edited here by whoever may edit it.
+ */
 export default function SchedulePage() {
   const user = useCurrentUser()
   const canEdit = hasAtLeast(user.role, 'CR')
@@ -26,17 +34,18 @@ export default function SchedulePage() {
     <>
       <PageHeader
         title="Class routine"
-        description={canEdit ? 'Your weekly timetable. You can edit it for your class.' : 'Your weekly timetable.'}
+        description="Read from the sheet your university publishes."
       />
+
+      <LiveRoutine />
 
       {canEdit && <RoutineEditor />}
 
-      <Card title="This week">
-        {routine.isLoading ? (
-          <Loading rows={4} />
-        ) : (routine.data ?? []).length === 0 ? (
-          <EmptyState title="No routine yet" hint="Once a class representative adds classes they appear here." />
-        ) : (
+      {canEdit && (routine.data ?? []).length > 0 && (
+        <Card title="Classes kept in LearnX">
+          <p className="small muted">
+            These are merged into the week above, marked as coming from your class list.
+          </p>
           <div className="week-grid">
             {DAY_ORDER.map((day) => {
               const classes = (routine.data ?? [])
@@ -55,15 +64,15 @@ export default function SchedulePage() {
                       <div className="small muted">
                         {[item.roomNo, item.teacherName].filter(Boolean).join(' · ')}
                       </div>
-                      {canEdit && <DeleteRoutineButton id={item.id} />}
+                      <DeleteRoutineButton id={item.id} />
                     </div>
                   ))}
                 </div>
               )
             })}
           </div>
-        )}
-      </Card>
+        </Card>
+      )}
 
       <Card title="Class tests">
         {canEdit && <ClassTestForm />}

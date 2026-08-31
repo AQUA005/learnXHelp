@@ -10,7 +10,26 @@
       every page load made a request for /favicon.ico that nothing answered.
     -->
     <link rel="icon" href="/api/public/branding/icon" />
+    <!--
+      Space Grotesk sets the headings and Outfit the body text. Preconnected
+      because the stylesheet request and the font files it names are on
+      separate hosts, and the second one is not discoverable until the first
+      has answered.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300..800&family=Space+Grotesk:wght@400..700&display=swap"
+    />
     <title>LearnX</title>
+    <!--
+      The theme is resolved before the first paint, not after React mounts, so
+      somebody who has chosen dark never sees a white page while the bundle
+      arrives. Blocking and same-origin on purpose: the Content-Security-Policy
+      is script-src 'self', which an inline snippet would force us to weaken.
+    -->
+    <script src="/theme-boot.js"></script>
   </head>
   <body>
     <div id="root"></div>

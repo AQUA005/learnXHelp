@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useSession } from '@/lib/session'
-import { useBranding } from '@/lib/branding'
+import { brandMarkUrl, useBranding } from '@/lib/branding'
 import type { Role } from '@/lib/types'
 import { Icon } from '@/components/icons'
 import { initialsOf } from '@/components/ui'
+import ThemeToggle from '@/components/ThemeToggle'
 import { activeLabel, isNavItemActive, navigationFor } from './navigation'
 
 export default function AppShell() {
@@ -32,7 +33,7 @@ export default function AppShell() {
 
       <aside className={menuOpen ? 'sidebar open' : 'sidebar'}>
         <div className="sidebar-brand">
-          {branding.logoUrl && <img className="brand-logo" src={branding.logoUrl} alt="" />}
+          <img className="brand-logo" src={brandMarkUrl(branding)} alt="" />
           <span>{branding.siteName}</span>
         </div>
 
@@ -80,6 +81,7 @@ export default function AppShell() {
         </nav>
 
         <div className="sidebar-footer">
+          <ThemeToggle />
           <button className="btn btn-secondary btn-block" onClick={() => void signOut()}>
             Sign out
           </button>

@@ -1,5 +1,5 @@
 import { Link, Outlet } from 'react-router-dom'
-import { useBranding } from '@/lib/branding'
+import { brandMarkUrl, useBranding } from '@/lib/branding'
 
 /**
  * The frame around every page a visitor sees before signing in.
@@ -14,7 +14,7 @@ export default function PublicShell() {
     <div className="public-shell">
       <header className="public-header">
         <Link className="public-brand" to="/">
-          {branding.logoUrl && <img className="public-brand-logo" src={branding.logoUrl} alt="" />}
+          <img className="public-brand-logo" src={brandMarkUrl(branding)} alt="" />
           <span>{branding.siteName}</span>
         </Link>
 
