@@ -5,6 +5,7 @@ import { useCurrentUser } from '@/lib/session'
 import { countdownTo, formatDateTime, formatTime } from '@/lib/format'
 import type { StudyResource } from '@/lib/types'
 import { Badge, Card, EmptyState, Loading, PageHeader } from '@/components/ui'
+import StatTile from './StatTile'
 import {
   firstName,
   partOfDay,
@@ -41,26 +42,33 @@ export default function TeacherDashboard() {
       />
 
       <div className="grid grid-3" style={{ marginBottom: '1rem' }}>
-        <Card>
-          <div className="stat">
-            <span className="stat-value mono">{todaysClasses.length}</span>
-            <span className="stat-label">Classes today</span>
-          </div>
-        </Card>
-        <Card>
-          <div className="stat">
-            <span className="stat-value mono">{upcomingTests.length}</span>
-            <span className="stat-label">Upcoming class tests</span>
-          </div>
-        </Card>
-        <Card>
-          <div className="stat">
-            <span className="stat-value mono">
-              {pendingNotes.isLoading ? '—' : awaitingApproval.length}
-            </span>
-            <span className="stat-label">Notes to approve</span>
-          </div>
-        </Card>
+        <StatTile
+          icon="calendar"
+          value={todaysClasses.length}
+          label="Classes today"
+          hint={
+            todaysClasses.length === 0
+              ? 'Nothing on the routine today'
+              : `First at ${formatTime(todaysClasses[0].startTime)}`
+          }
+        />
+        <StatTile
+          icon="clock"
+          value={upcomingTests.length}
+          label="Upcoming class tests"
+          hint={
+            upcomingTests.length === 0
+              ? 'None scheduled yet'
+              : `Next in ${countdownTo(upcomingTests[0].dateTime) || 'moments'}`
+          }
+        />
+        <StatTile
+          icon="shield"
+          value={pendingNotes.isLoading ? '—' : awaitingApproval.length}
+          label="Notes to approve"
+          hint={awaitingApproval.length === 0 ? 'The queue is clear' : 'Waiting on you'}
+          tone={awaitingApproval.length > 0 ? 'warning' : undefined}
+        />
       </div>
 
       <div className="grid grid-2">
@@ -75,7 +83,7 @@ export default function TeacherDashboard() {
           {routine.isLoading ? (
             <Loading />
           ) : todaysClasses.length === 0 ? (
-            <EmptyState title="No classes today" />
+            <EmptyState icon="calendar" title="No classes today" hint="Nothing on your routine for today." />
           ) : (
             <div>
               {todaysClasses.map((item) => (
@@ -104,7 +112,7 @@ export default function TeacherDashboard() {
           {pendingNotes.isLoading ? (
             <Loading />
           ) : awaitingApproval.length === 0 ? (
-            <EmptyState title="Nothing to review" hint="Uploaded notes appear here first." />
+            <EmptyState icon="shield" title="Nothing to review" hint="Uploaded notes wait here for your approval." />
           ) : (
             <div>
               {awaitingApproval.slice(0, 5).map((note) => (
@@ -123,7 +131,7 @@ export default function TeacherDashboard() {
           {classTests.isLoading ? (
             <Loading />
           ) : upcomingTests.length === 0 ? (
-            <EmptyState title="Nothing scheduled" />
+            <EmptyState icon="clock" title="Nothing scheduled" hint="No class tests are coming up." />
           ) : (
             <div>
               {upcomingTests.map((test) => (

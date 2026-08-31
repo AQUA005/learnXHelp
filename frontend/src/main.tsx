@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ApiError } from '@/lib/api'
 import { SessionProvider } from '@/lib/session'
+import { ThemeProvider } from '@/lib/theme'
 import { ToastProvider } from '@/lib/toast'
 import AppRoutes from '@/app/routes'
 import Backdrop from '@/components/Backdrop'
@@ -31,14 +32,16 @@ if (!container) {
 createRoot(container).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <SessionProvider>
-          <Backdrop />
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
-        </SessionProvider>
-      </ToastProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          <SessionProvider>
+            <Backdrop />
+            <BrowserRouter>
+              <AppRoutes />
+            </BrowserRouter>
+          </SessionProvider>
+        </ToastProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   </StrictMode>,
 )

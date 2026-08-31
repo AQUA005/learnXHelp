@@ -9,12 +9,29 @@
    be read closely: tables, forms and the exam room sit on a solid panel, so
    nothing a student is marked on is read through a blur. */
 
+/* Light is the default and dark is one attribute away.
+
+   `data-theme` is written by a small script in the page head before the first
+   paint and kept in step by the theme control, so `system` is already resolved
+   to one value or the other by the time any of this is read. That is why there
+   is no prefers-color-scheme query here: one selector, and the viewer's own
+   choice can override the machine's. */
 :root {
   color-scheme: light;
 
   /* The ground the whole application sits on. */
   --ground: #ccd0cf;
   --ground-deep: #9ba8ab;
+
+  /* The washes and blobs behind everything, as tokens so the two themes
+     differ in one block rather than in every rule that paints them. */
+  --wash-1: rgb(255 255 255 / 60%);
+  --wash-2: rgb(158 198 216 / 26%);
+  --blob-1-color: #8fb6c6;
+  --blob-2-color: #9ba8ab;
+  --blob-3-color: #4a5c6a;
+  --blob-opacity: 0.24;
+  --blob-3-opacity: 0.16;
 
   /* Panels. Glass is translucent and blurred; panel is solid, for dense text. */
   --glass: rgb(255 255 255 / 30%);
@@ -57,42 +74,48 @@
   --font-display: "Space Grotesk", "Outfit", "Segoe UI", system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
+:root[data-theme="dark"] {
+  color-scheme: dark;
 
-    --ground: #06141b;
-    --ground-deep: #11212d;
+  --ground: #06141b;
+  --ground-deep: #11212d;
 
-    --glass: rgb(255 255 255 / 7%);
-    --glass-hover: rgb(255 255 255 / 12%);
-    --glass-border: rgb(255 255 255 / 14%);
-    --glass-border-lit: rgb(255 255 255 / 26%);
-    --panel: rgb(17 33 45 / 92%);
-    --panel-muted: rgb(17 33 45 / 65%);
+  --wash-1: rgb(37 55 69 / 85%);
+  --wash-2: rgb(17 33 45 / 90%);
+  --blob-1-color: #1d4a5e;
+  --blob-2-color: #253745;
+  --blob-3-color: #11212d;
+  --blob-opacity: 0.34;
+  --blob-3-opacity: 0.4;
 
-    --surface: var(--glass);
-    --surface-muted: rgb(255 255 255 / 9%);
-    --border: rgb(204 208 207 / 16%);
+  --glass: rgb(255 255 255 / 7%);
+  --glass-hover: rgb(255 255 255 / 12%);
+  --glass-border: rgb(255 255 255 / 14%);
+  --glass-border-lit: rgb(255 255 255 / 26%);
+  --panel: rgb(17 33 45 / 92%);
+  --panel-muted: rgb(17 33 45 / 65%);
 
-    --text: #ccd0cf;
-    --text-strong: #eef1f0;
-    --text-muted: #9ba8ab;
+  --surface: var(--glass);
+  --surface-muted: rgb(255 255 255 / 9%);
+  --border: rgb(204 208 207 / 16%);
 
-    --accent: #9ec6d8;
-    --accent-contrast: #06141b;
-    --accent-soft: rgb(158 198 216 / 16%);
+  --text: #ccd0cf;
+  --text-strong: #eef1f0;
+  --text-muted: #9ba8ab;
 
-    --success: #5fd39a;
-    --success-soft: rgb(95 211 154 / 16%);
-    --warning: #e6b45c;
-    --warning-soft: rgb(230 180 92 / 16%);
-    --danger: #f0806f;
-    --danger-soft: rgb(240 128 111 / 16%);
+  --accent: #9ec6d8;
+  --accent-contrast: #06141b;
+  --accent-soft: rgb(158 198 216 / 16%);
 
-    --shadow: 0 10px 34px rgb(0 0 0 / 34%), inset 0 1px 0 rgb(255 255 255 / 6%);
-    --shadow-lifted: 0 20px 46px -12px rgb(0 0 0 / 46%), inset 0 1px 0 rgb(255 255 255 / 10%);
-  }
+  --success: #5fd39a;
+  --success-soft: rgb(95 211 154 / 16%);
+  --warning: #e6b45c;
+  --warning-soft: rgb(230 180 92 / 16%);
+  --danger: #f0806f;
+  --danger-soft: rgb(240 128 111 / 16%);
+
+  --shadow: 0 10px 34px rgb(0 0 0 / 34%), inset 0 1px 0 rgb(255 255 255 / 6%);
+  --shadow-lifted: 0 20px 46px -12px rgb(0 0 0 / 46%), inset 0 1px 0 rgb(255 255 255 / 10%);
 }
 
 * { box-sizing: border-box; }
@@ -144,31 +167,22 @@ a { color: var(--accent); }
   /* A light wash from the top left keeps the sheet from reading as flat
      grey once the blobs are this soft. */
   background:
-    radial-gradient(900px 620px at 10% -8%, rgb(255 255 255 / 60%), transparent 62%),
-    radial-gradient(1100px 760px at 92% 4%, rgb(158 198 216 / 26%), transparent 66%);
+    radial-gradient(900px 620px at 10% -8%, var(--wash-1), transparent 62%),
+    radial-gradient(1100px 760px at 92% 4%, var(--wash-2), transparent 66%);
 }
 
 .blob {
   position: absolute;
   border-radius: 50%;
   filter: blur(130px);
-  opacity: 0.24;
+  opacity: var(--blob-opacity);
   animation: float 26s ease-in-out infinite alternate;
 }
-.blob-1 { top: -16%; left: 2%; width: 42vw; height: 42vw; background: #8fb6c6; }
-.blob-2 { bottom: -22%; right: -4%; width: 38vw; height: 38vw; background: #9ba8ab; animation-delay: -9s; }
-.blob-3 { top: 58%; left: 34%; width: 26vw; height: 26vw; background: #4a5c6a; animation-delay: -18s; opacity: 0.16; }
-
-@media (prefers-color-scheme: dark) {
-  .backdrop {
-    background:
-      radial-gradient(900px 620px at 8% -10%, rgb(37 55 69 / 85%), transparent 62%),
-      radial-gradient(1000px 720px at 94% 6%, rgb(17 33 45 / 90%), transparent 66%);
-  }
-  .blob { opacity: 0.34; }
-  .blob-1 { background: #1d4a5e; }
-  .blob-2 { background: #253745; }
-  .blob-3 { background: #11212d; opacity: 0.4; }
+.blob-1 { top: -16%; left: 2%; width: 42vw; height: 42vw; background: var(--blob-1-color); }
+.blob-2 { bottom: -22%; right: -4%; width: 38vw; height: 38vw; background: var(--blob-2-color); animation-delay: -9s; }
+.blob-3 {
+  top: 58%; left: 34%; width: 26vw; height: 26vw;
+  background: var(--blob-3-color); animation-delay: -18s; opacity: var(--blob-3-opacity);
 }
 
 @keyframes float {
@@ -287,7 +301,41 @@ a { color: var(--accent); }
 }
 .nav-link.active svg { color: var(--accent); }
 
-.sidebar-footer { padding: 0.8rem 0.7rem 1rem; }
+.sidebar-footer { padding: 0.8rem 0.7rem 1rem; display: grid; gap: 0.6rem; }
+
+/* Three states, not two: following the machine is a real answer. */
+.theme-toggle {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+  border: 1px solid var(--glass-border);
+}
+
+.theme-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.32rem 0.4rem;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.theme-option svg { width: 15px; height: 15px; }
+.theme-option:hover { color: var(--text); }
+.theme-option.active {
+  background: var(--panel);
+  color: var(--text-strong);
+  box-shadow: var(--shadow);
+}
 
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 
@@ -342,7 +390,24 @@ a { color: var(--accent); }
 .grid-2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
 .grid-3 { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
 
+/* A number is not a fact on its own: the tile carries what it counts and,
+   where there is one, the next thing that will change it. */
+.stat-tile { display: flex; align-items: flex-start; gap: 0.9rem; }
+
+.stat-mark {
+  flex: none;
+  width: 42px; height: 42px;
+  display: grid; place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft); color: var(--accent);
+  border: 1px solid var(--glass-border);
+}
+.stat-mark svg { width: 20px; height: 20px; }
+.stat-mark-warning { background: var(--warning-soft); color: var(--warning); }
+.stat-mark-success { background: var(--success-soft); color: var(--success); }
+
 .stat { display: flex; flex-direction: column; gap: 0.15rem; }
+.stat-hint { display: block; margin-top: 0.2rem; }
 .stat-value {
   font-family: var(--font-display);
   font-size: 1.85rem; font-weight: 700; line-height: 1.05;
@@ -455,6 +520,16 @@ tbody tr:hover td { background: var(--surface-muted); }
 
 .empty { text-align: center; padding: 2.25rem 1rem; color: var(--text-muted); }
 .empty h3 { color: var(--text); }
+.empty p { margin: 0; }
+
+.empty-mark {
+  width: 46px; height: 46px; margin: 0 auto 0.75rem;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--surface-muted); color: var(--text-muted);
+  border: 1px solid var(--glass-border);
+}
+.empty-mark svg { width: 22px; height: 22px; }
 
 .alert {
   padding: 0.7rem 0.9rem;

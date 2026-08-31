@@ -199,6 +199,25 @@ test('each role gets its own navigation, not a longer one', async ({ page }) => 
   await expect(current).toHaveText('Change history')
 })
 
+test('the theme is the viewer\'s choice, and it is remembered', async ({ page }) => {
+  await signIn(page, 'student@learnx.help')
+
+  // The browser reports a light machine, and nothing has been chosen yet.
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+
+  await page.getByRole('button', { name: 'Dark' }).click()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+
+  // Surviving the reload is the point: the choice is read back in the page
+  // head, before the first paint, rather than after the bundle mounts.
+  await page.reload()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+
+  // And handing the decision back to the machine returns it to light.
+  await page.getByRole('button', { name: 'Auto' }).click()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+})
+
 test('the health probe answers without a session', async ({ request }) => {
   const response = await request.get('/actuator/health')
   expect(response.ok()).toBeTruthy()

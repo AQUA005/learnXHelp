@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useCurrentUser } from '@/lib/session'
 import { countdownTo, formatDateTime, formatTime } from '@/lib/format'
 import { Badge, Card, EmptyState, Loading, PageHeader } from '@/components/ui'
+import StatTile from './StatTile'
 import {
   averagePercentage,
   firstName,
@@ -28,7 +29,9 @@ export default function StudentDashboard() {
   const upcomingTests = upcomingTestsFrom(classTests.data ?? [])
   const recentAnnouncements = (announcements.data ?? []).slice(0, 4)
 
-  const average = averagePercentage(performance.data ?? [])
+  const results = performance.data ?? []
+  const average = averagePercentage(results)
+  const scored = results.filter((stat) => stat.maxMarks > 0)
 
   return (
     <>
@@ -38,24 +41,37 @@ export default function StudentDashboard() {
       />
 
       <div className="grid grid-3" style={{ marginBottom: '1rem' }}>
-        <Card>
-          <div className="stat">
-            <span className="stat-value mono">{todaysClasses.length}</span>
-            <span className="stat-label">Classes today</span>
-          </div>
-        </Card>
-        <Card>
-          <div className="stat">
-            <span className="stat-value mono">{upcomingTests.length}</span>
-            <span className="stat-label">Upcoming class tests</span>
-          </div>
-        </Card>
-        <Card>
-          <div className="stat">
-            <span className="stat-value mono">{average == null ? '—' : `${average}%`}</span>
-            <span className="stat-label">Average result</span>
-          </div>
-        </Card>
+        <StatTile
+          icon="calendar"
+          value={todaysClasses.length}
+          label="Classes today"
+          hint={
+            todaysClasses.length === 0
+              ? 'Nothing on the routine today'
+              : `Next at ${formatTime(todaysClasses[0].startTime)}`
+          }
+        />
+        <StatTile
+          icon="clock"
+          value={upcomingTests.length}
+          label="Upcoming class tests"
+          hint={
+            upcomingTests.length === 0
+              ? 'None announced yet'
+              : `Next in ${countdownTo(upcomingTests[0].dateTime) || 'moments'}`
+          }
+          tone={upcomingTests.length > 0 ? 'warning' : undefined}
+        />
+        <StatTile
+          icon="chart"
+          value={average == null ? '—' : `${average}%`}
+          label="Average result"
+          hint={
+            average == null
+              ? 'No marks published yet'
+              : `Across ${scored.length} assessment${scored.length === 1 ? '' : 's'}`
+          }
+        />
       </div>
 
       <div className="grid grid-2">
@@ -70,7 +86,7 @@ export default function StudentDashboard() {
           {routine.isLoading ? (
             <Loading />
           ) : todaysClasses.length === 0 ? (
-            <EmptyState title="No classes today" hint="Enjoy the break." />
+            <EmptyState icon="calendar" title="No classes today" hint="Nothing on your routine for today." />
           ) : (
             <div>
               {todaysClasses.map((item) => (
@@ -92,7 +108,7 @@ export default function StudentDashboard() {
           {classTests.isLoading ? (
             <Loading />
           ) : upcomingTests.length === 0 ? (
-            <EmptyState title="Nothing scheduled" hint="No class tests are coming up." />
+            <EmptyState icon="clock" title="Nothing scheduled" hint="No class tests have been announced." />
           ) : (
             <div>
               {upcomingTests.map((test) => (
@@ -124,7 +140,7 @@ export default function StudentDashboard() {
           {announcements.isLoading ? (
             <Loading />
           ) : recentAnnouncements.length === 0 ? (
-            <EmptyState title="Nothing new" />
+            <EmptyState icon="megaphone" title="Nothing new" hint="Announcements from your class appear here." />
           ) : (
             <div>
               {recentAnnouncements.map((item) => (
@@ -152,7 +168,7 @@ export default function StudentDashboard() {
           {performance.isLoading ? (
             <Loading />
           ) : (performance.data ?? []).length === 0 ? (
-            <EmptyState title="No results yet" hint="Marks appear here once published." />
+            <EmptyState icon="chart" title="No results yet" hint="Marks appear here once a teacher publishes them." />
           ) : (
             <div className="table-wrap">
               <table>

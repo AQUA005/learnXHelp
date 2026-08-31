@@ -4,6 +4,7 @@ import { api } from '@/lib/api'
 import { useCurrentUser } from '@/lib/session'
 import { formatDateTime } from '@/lib/format'
 import { Card, EmptyState, Loading, PageHeader } from '@/components/ui'
+import StatTile from './StatTile'
 import { firstName, partOfDay } from './queries'
 
 type PendingUser = { id: number; fullName: string; role: string; department: string }
@@ -56,24 +57,25 @@ export default function AdminDashboard() {
       />
 
       <div className="grid grid-3" style={{ marginBottom: '1rem' }}>
-        <Card>
-          <div className="stat">
-            <span className="stat-value mono">{pending.isLoading ? '—' : waiting.length}</span>
-            <span className="stat-label">Awaiting approval</span>
-          </div>
-        </Card>
-        <Card>
-          <div className="stat">
-            <span className="stat-value mono">{classes.isLoading ? '—' : groups.length}</span>
-            <span className="stat-label">Class groups</span>
-          </div>
-        </Card>
-        <Card>
-          <div className="stat">
-            <span className="stat-value mono">{classes.isLoading ? '—' : students}</span>
-            <span className="stat-label">Students enrolled</span>
-          </div>
-        </Card>
+        <StatTile
+          icon="approvals"
+          value={pending.isLoading ? '—' : waiting.length}
+          label="Awaiting approval"
+          hint={waiting.length === 0 ? 'Nobody is waiting to be let in' : 'Sign-ups needing a decision'}
+          tone={waiting.length > 0 ? 'warning' : undefined}
+        />
+        <StatTile
+          icon="classes"
+          value={classes.isLoading ? '—' : groups.length}
+          label="Class groups"
+          hint={groups.length === 0 ? 'None created yet' : 'Batches, semesters and sections'}
+        />
+        <StatTile
+          icon="people"
+          value={classes.isLoading ? '—' : students}
+          label="Students enrolled"
+          hint={groups.length === 0 ? 'No classes to enrol into' : `Across ${groups.length} class${groups.length === 1 ? '' : 'es'}`}
+        />
       </div>
 
       <div className="grid grid-2">
@@ -88,7 +90,7 @@ export default function AdminDashboard() {
           {pending.isLoading ? (
             <Loading />
           ) : waiting.length === 0 ? (
-            <EmptyState title="Nothing to approve" hint="New sign-ups appear here." />
+            <EmptyState icon="approvals" title="Nothing to approve" hint="New sign-ups wait here for a decision." />
           ) : (
             <div>
               {waiting.slice(0, 5).map((account) => (
@@ -116,7 +118,7 @@ export default function AdminDashboard() {
           {classes.isLoading ? (
             <Loading />
           ) : groups.length === 0 ? (
-            <EmptyState title="No class groups yet" />
+            <EmptyState icon="classes" title="No class groups yet" hint="Create one before enrolling students." />
           ) : (
             <div>
               {groups.slice(0, 6).map((group) => (
@@ -137,7 +139,7 @@ export default function AdminDashboard() {
           {audit.isLoading ? (
             <Loading />
           ) : (audit.data ?? []).length === 0 ? (
-            <EmptyState title="Nothing recorded yet" />
+            <EmptyState icon="history" title="Nothing recorded yet" hint="Edits to the routine and class tests are logged here." />
           ) : (
             <div>
               {(audit.data ?? []).slice(0, 6).map((entry) => (
