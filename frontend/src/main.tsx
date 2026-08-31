@@ -6,6 +6,7 @@ import { ApiError } from '@/lib/api'
 import { SessionProvider } from '@/lib/session'
 import { ToastProvider } from '@/lib/toast'
 import AppRoutes from '@/app/routes'
+import Backdrop from '@/components/Backdrop'
 import './styles.css'
 
 const queryClient = new QueryClient({
@@ -32,6 +33,7 @@ createRoot(container).render(
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <SessionProvider>
+          <Backdrop />
           <BrowserRouter>
             <AppRoutes />
           </BrowserRouter>
